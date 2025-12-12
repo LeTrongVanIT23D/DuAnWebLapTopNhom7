@@ -1,17 +1,22 @@
-import React, { useEffect } from "react";
-import ProdictItem from "../product/ProductItem";
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import slugify from "slugify";
+import { disableBodyScroll, enableBodyScroll } from "body-scroll-lock";
+
+// 1. Sửa lỗi chính tả tên Component
+import ProductItem from "../product/ProductItem"; 
+
+// 2. Import Swiper đúng chuẩn phiên bản mới
 import { Swiper, SwiperSlide } from "swiper/react";
-import { Navigation, Pagination, EffectCards } from "swiper";
+import { Navigation, Pagination } from "swiper/modules"; 
+
+// Import CSS
 import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
-import "swiper/css/effect-cards";
-import { useNavigate } from "react-router-dom";
-import slugify from "slugify";
+
 import ModalAdvanced from "../../components/Modal/ModalAdvanced";
-import { useState } from "react";
 import { formatPrice } from "../../utils/formatPrice";
-import { disableBodyScroll, enableBodyScroll } from "body-scroll-lock";
 
 const ProductListHome = ({ data, bg = "", className = "" }) => {
   const navigate = useNavigate();
@@ -20,58 +25,80 @@ const ProductListHome = ({ data, bg = "", className = "" }) => {
 
   const [selectedItems, setSelectedItems] = useState([]);
 
+  // --- Logic So Sánh ---
   const addToCompare = (item) => {
-    setSelectedItems((selectedItems) => [...selectedItems, item]);
+    if (selectedItems.length < 2) {
+       // Tránh thêm trùng sản phẩm
+       if (!selectedItems.some(i => i._id === item._id)) {
+          setSelectedItems((prev) => [...prev, item]);
+       }
+    }
   };
 
+  const removeFromCompare = (item) => {
+    const filteredItems = selectedItems.filter(
+      (product) => product._id !== item._id
+    );
+    setSelectedItems(filteredItems);
+  };
+
+  // Mở modal khi chọn đủ 2 sản phẩm
   useEffect(() => {
     if (selectedItems.length === 2) {
       setShowModal(true);
     }
   }, [selectedItems]);
 
-  const removeFromCompare = (item) => {
-    const filteredItems = selectedItems.filter(
-      (product) => product.id !== item.id
-    );
-    setSelectedItems((selectedItems) => filteredItems);
-  };
-
+  // Khóa cuộn trang khi mở modal
   useEffect(() => {
-    if (showModal === true) {
+    if (showModal) {
       disableBodyScroll(bodyStyle);
-    }
-    if (showModal === false) {
+    } else {
       enableBodyScroll(bodyStyle);
     }
-  }, [showModal]);
+  }, [showModal, bodyStyle]);
 
   const handleClick = (item) => {
-    const path = slugify(item.title, { strict: true });
+    const path = slugify(item.title, { strict: true, lower: true });
     navigate(`/${path}/${item._id}`);
   };
+
+  // Component icon check xanh (cho gọn code)
+  const CheckIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="green" className="w-6 h-6 inline-block ml-1">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  );
+
   return (
     <div className={`${className}`}>
       <div
-        className={`container ${
-          bg === "bg1" ? 'bg-[url("../images/bg-laptop.png")] h-[460px]' : ""
+        className={`container mx-auto p-4 ${
+          bg === "bg1" ? 'bg-[url("../images/bg-laptop.png")]' : ""
         }
-        ${bg === "bg2" ? 'bg-[url("../images/bg-laptop-1.png")] h-[460px]' : ""}
-           bg-no-repeat w-full bg-cover rounded-lg `}
+        ${bg === "bg2" ? 'bg-[url("../images/bg-laptop-1.png")]' : ""}
+        bg-no-repeat w-full bg-cover rounded-xl shadow-sm`}
+        style={{ minHeight: '460px' }} // Dùng minHeight để an toàn hơn
       >
         <Swiper
-          modules={[Navigation, Pagination, EffectCards]}
-          slidesPerView={5}
-          slidesPerGroup={5}
+          modules={[Navigation, Pagination]}
+          spaceBetween={20}
           navigation
           pagination={{ clickable: true }}
-          className={`w-full rounded-lg ${className}`}
+          className="w-full h-full py-5 px-2"
+          // Responsive: Mobile hiện 2, Tablet hiện 3, PC hiện 5
+          breakpoints={{
+            320: { slidesPerView: 2, spaceBetween: 10 },
+            640: { slidesPerView: 3, spaceBetween: 20 },
+            1024: { slidesPerView: 4, spaceBetween: 20 },
+            1280: { slidesPerView: 5, spaceBetween: 20 },
+          }}
         >
-          {data.length > 0 &&
+          {data?.length > 0 &&
             data.map((item) => (
-              <SwiperSlide key={item.id}>
-                <ProdictItem
-                  product={item}
+              <SwiperSlide key={item._id || item.id}>
+                <ProductItem
+                  product={item} // Đảm bảo ProductItem nhận đúng prop này
                   onClickItem={() => handleClick(item)}
                   selected={selectedItems}
                   addToCompare={addToCompare}
@@ -81,317 +108,104 @@ const ProductListHome = ({ data, bg = "", className = "" }) => {
             ))}
         </Swiper>
       </div>
-      {selectedItems.length === 2 && (
-        <div>
-          <ModalAdvanced
-            visible={showModal}
-            onClose={() => {
-              setShowModal(false);
-              setSelectedItems([]);
-            }}
-            bodyClassName="w-[1050px] bg-white p-10 rounded-lg relative z-10 content h-[600px] overflow-y-auto overflow-x-hidden"
-          >
-            <table className="table-product items-center table-fixed w-full">
-              <thead>
-                <tr>
-                  <th></th>
-                  <th className="text-base font-semibold items-start">
-                    Sản phẩm 1
-                  </th>
-                  <th className="text-base font-semibold">Sản phẩm 2</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="text-base font-semibold">Ảnh sản phẩm</td>
-                  <td>
-                    <img
-                      src={selectedItems[0]?.images[0]}
-                      alt=""
-                      className="w-[200px] h-[200px] object-cover mx-auto"
-                    />
-                  </td>
-                  <td>
-                    <img
-                      src={selectedItems[1]?.images[0]}
-                      alt=""
-                      className="w-[200px] h-[200px] object-cover mx-auto"
-                    />
-                  </td>
-                </tr>
-                <tr>
-                  <td className="text-base font-semibold">Tên sản phẩm</td>
-                  <td>
-                    <span
-                      className="text-base font-normal line-clamp-2 cursor-pointer"
-                      title={selectedItems[0]?.title}
-                    >
-                      {selectedItems[0]?.title}
-                    </span>
-                  </td>
-                  <td>
-                    <span
-                      className="text-base font-normal line-clamp-2 cursor-pointer"
-                      title={selectedItems[1]?.title}
-                    >
-                      {selectedItems[1]?.title}
-                    </span>
-                  </td>
-                </tr>
-                <tr>
-                  <td className="text-base font-semibold">Thương hiệu</td>
-                  <td>
-                    <span className="text-base font-normal">
-                      {selectedItems[0]?.brand.name}
-                    </span>
-                  </td>
-                  <td>
-                    <span className="text-base font-normal">
-                      {selectedItems[1]?.brand.name}
-                    </span>
-                  </td>
-                </tr>
 
-                <tr>
-                  <td className="text-base font-semibold">Hệ điều hành</td>
-                  <td>
-                    <span className="text-base font-normal">
-                      {selectedItems[0]?.os}
-                    </span>
-                  </td>
-                  <td>
-                    <span className="text-base font-normal">
-                      {selectedItems[1]?.os}
-                    </span>
-                  </td>
+      {/* --- MODAL SO SÁNH --- */}
+      {selectedItems.length === 2 && (
+        <ModalAdvanced
+          visible={showModal}
+          onClose={() => {
+            setShowModal(false);
+            setSelectedItems([]);
+          }}
+          bodyClassName="w-[90vw] max-w-[1050px] bg-white p-6 rounded-xl relative z-50 h-[80vh] overflow-y-auto shadow-2xl"
+        >
+          <div className="text-center mb-6">
+             <h3 className="text-2xl font-bold text-blue-800">So Sánh Sản Phẩm</h3>
+          </div>
+          
+          <table className="table-auto w-full border-collapse border border-gray-200">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="p-3 border border-gray-200 w-1/5">Tiêu chí</th>
+                <th className="p-3 border border-gray-200 w-2/5 text-blue-700">{selectedItems[0]?.title}</th>
+                <th className="p-3 border border-gray-200 w-2/5 text-blue-700">{selectedItems[1]?.title}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {/* Ảnh */}
+              <tr>
+                <td className="p-3 border font-semibold">Hình ảnh</td>
+                <td className="p-3 border text-center">
+                  <img src={selectedItems[0]?.images?.[0]} alt="" className="w-32 h-32 object-contain mx-auto" />
+                </td>
+                <td className="p-3 border text-center">
+                  <img src={selectedItems[1]?.images?.[0]} alt="" className="w-32 h-32 object-contain mx-auto" />
+                </td>
+              </tr>
+
+              {/* Thương hiệu */}
+              <tr>
+                <td className="p-3 border font-semibold">Thương hiệu</td>
+                <td className="p-3 border text-center">{selectedItems[0]?.brand?.name}</td>
+                <td className="p-3 border text-center">{selectedItems[1]?.brand?.name}</td>
+              </tr>
+
+              {/* Giá Tiền (Logic: Thấp hơn là tốt) */}
+              <tr>
+                <td className="p-3 border font-semibold">Giá bán</td>
+                <td className="p-3 border text-center font-bold text-red-600">
+                   {formatPrice(selectedItems[0]?.promotion)}
+                   {selectedItems[0]?.promotion <= selectedItems[1]?.promotion && <CheckIcon />}
+                </td>
+                <td className="p-3 border text-center font-bold text-red-600">
+                   {formatPrice(selectedItems[1]?.promotion)}
+                   {selectedItems[1]?.promotion <= selectedItems[0]?.promotion && <CheckIcon />}
+                </td>
+              </tr>
+
+              {/* RAM (Logic: Cao hơn là tốt) */}
+              <tr>
+                <td className="p-3 border font-semibold">RAM</td>
+                <td className="p-3 border text-center">
+                   {selectedItems[0]?.ram} GB
+                   {Number(selectedItems[0]?.ram) >= Number(selectedItems[1]?.ram) && <CheckIcon />}
+                </td>
+                <td className="p-3 border text-center">
+                   {selectedItems[1]?.ram} GB
+                   {Number(selectedItems[1]?.ram) >= Number(selectedItems[0]?.ram) && <CheckIcon />}
+                </td>
+              </tr>
+
+              {/* Cân nặng (Logic: Thấp hơn là tốt) */}
+              <tr>
+                <td className="p-3 border font-semibold">Trọng lượng</td>
+                <td className="p-3 border text-center">
+                   {selectedItems[0]?.weight} kg
+                   {selectedItems[0]?.weight <= selectedItems[1]?.weight && <CheckIcon />}
+                </td>
+                <td className="p-3 border text-center">
+                   {selectedItems[1]?.weight} kg
+                   {selectedItems[1]?.weight <= selectedItems[0]?.weight && <CheckIcon />}
+                </td>
+              </tr>
+
+              {/* Các thông số khác (Text thuần) */}
+              {[
+                 { label: "CPU", key: "cpu" },
+                 { label: "Màn hình", key: "screen" },
+                 { label: "Card đồ họa", key: "graphicCard" },
+                 { label: "Pin", key: "battery" },
+                 { label: "Hệ điều hành", key: "os" },
+              ].map((row) => (
+                <tr key={row.key}>
+                   <td className="p-3 border font-semibold">{row.label}</td>
+                   <td className="p-3 border text-center">{selectedItems[0]?.[row.key]}</td>
+                   <td className="p-3 border text-center">{selectedItems[1]?.[row.key]}</td>
                 </tr>
-                <tr>
-                  <td className="text-base font-semibold">Màu sắc</td>
-                  <td>
-                    <span className="text-base font-normal">
-                      {selectedItems[0]?.color}
-                    </span>
-                  </td>
-                  <td>
-                    <span className="text-base font-normal">
-                      {selectedItems[1]?.color}
-                    </span>
-                  </td>
-                </tr>
-                <tr>
-                  <td className="text-base font-semibold">CPU</td>
-                  <td>
-                    <span className="text-base font-normal">
-                      {selectedItems[0]?.cpu}
-                    </span>
-                  </td>
-                  <td>
-                    <span className="text-base font-normal">
-                      {selectedItems[1]?.cpu}
-                    </span>
-                  </td>
-                </tr>
-                <tr>
-                  <td className="text-base font-semibold">Màn hình</td>
-                  <td>
-                    <span className="text-base font-normal">
-                      {selectedItems[0]?.screen}
-                    </span>
-                  </td>
-                  <td>
-                    <span className="text-base font-normal">
-                      {selectedItems[1]?.screen}
-                    </span>
-                  </td>
-                </tr>
-                <tr>
-                  <td className="text-base font-semibold">Graphic Card</td>
-                  <td>
-                    <span className="text-base font-normal">
-                      {selectedItems[0]?.graphicCard}
-                    </span>
-                  </td>
-                  <td>
-                    <span className="text-base font-normal">
-                      {selectedItems[1]?.graphicCard}
-                    </span>
-                  </td>
-                </tr>
-                <tr>
-                  <td className="text-base font-semibold">Pin</td>
-                  <td>
-                    <span className="text-base font-normal">
-                      {selectedItems[0]?.battery}
-                    </span>
-                  </td>
-                  <td>
-                    <span className="text-base font-normal">
-                      {selectedItems[1]?.battery}
-                    </span>
-                  </td>
-                </tr>
-                <tr>
-                  <td className="text-base font-semibold">Nhu cầu</td>
-                  <td>
-                    <span className="text-base font-normal">
-                      {selectedItems[0]?.demand}
-                    </span>
-                  </td>
-                  <td>
-                    <span className="text-base font-normal">
-                      {selectedItems[1]?.demand}
-                    </span>
-                  </td>
-                </tr>
-                <tr>
-                  <td className="text-base font-semibold">Ram</td>
-                  <td>
-                    <span className="text-base font-normal flex items-center gap-x-2">
-                      {selectedItems[0]?.ram}
-                      {Number(selectedItems[0]?.ram) -
-                        Number(selectedItems[1]?.ram) >=
-                        0 && (
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          strokeWidth="1.5"
-                          stroke="green"
-                          className="w-10 h-10"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                          />
-                        </svg>
-                      )}
-                    </span>
-                  </td>
-                  <td>
-                    <span className="text-base font-normal flex items-center gap-x-2">
-                      {selectedItems[1]?.ram}
-                      {Number(selectedItems[1]?.ram) -
-                        Number(selectedItems[0]?.ram) >=
-                        0 && (
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          strokeWidth="1.5"
-                          stroke="green"
-                          className="w-10 h-10"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                          />
-                        </svg>
-                      )}
-                    </span>
-                  </td>
-                </tr>
-                <tr>
-                  <td className="text-base font-semibold">Khối lượng</td>
-                  <td>
-                    <span className="text-lg font-normal flex items-center gap-x-2">
-                      {selectedItems[0]?.weight}
-                      {selectedItems[0]?.weight - selectedItems[1]?.weight <=
-                        0 && (
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          strokeWidth="1.5"
-                          stroke="green"
-                          className="w-10 h-10"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                          />
-                        </svg>
-                      )}
-                    </span>
-                  </td>
-                  <td>
-                    <span className="text-lg font-normal flex items-center gap-x-2">
-                      {selectedItems[1]?.weight}
-                      {selectedItems[1]?.weight - selectedItems[0]?.weight <=
-                        0 && (
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          strokeWidth="1.5"
-                          stroke="green"
-                          className="w-10 h-10"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                          />
-                        </svg>
-                      )}
-                    </span>
-                  </td>
-                </tr>
-                <tr>
-                  <td className="text-lg font-semibold">Giá tiền</td>
-                  <td>
-                    <span className="text-lg font-normal flex items-center gap-x-2">
-                      {selectedItems[0]?.promotion}
-                      {selectedItems[0]?.promotion -
-                        selectedItems[1]?.promotion <=
-                        0 && (
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          strokeWidth="1.5"
-                          stroke="green"
-                          className="w-10 h-10"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                          />
-                        </svg>
-                      )}
-                    </span>
-                  </td>
-                  <td>
-                    <span className="text-lg font-normal flex items-center gap-x-2">
-                      {formatPrice(selectedItems[1]?.promotion)}
-                      {selectedItems[1]?.promotion -
-                        selectedItems[0]?.promotion <=
-                        0 && (
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          strokeWidth="1.5"
-                          stroke="green"
-                          className="w-10 h-10"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                          />
-                        </svg>
-                      )}
-                    </span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </ModalAdvanced>
-        </div>
+              ))}
+            </tbody>
+          </table>
+        </ModalAdvanced>
       )}
     </div>
   );
