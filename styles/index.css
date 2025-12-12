@@ -1,0 +1,205 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* --- 1. GLOBAL VARIABLES & RESET --- */
+:root {
+  --primary-color: #3b82f6; /* Blue 500 */
+  --radius: 12px;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  body {
+    @apply bg-[#f3f4f6] text-[#333] font-sans antialiased text-[15px] leading-relaxed;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply text-gray-900 font-bold;
+  }
+
+  a {
+    @apply no-underline transition-colors duration-200;
+  }
+  
+  /* Reset input focus styles */
+  input:focus, textarea:focus, select:focus {
+    @apply outline-none border-blue-500 ring-2 ring-blue-500/20 transition-all;
+  }
+}
+
+/* Container chuẩn */
+.container {
+  @apply w-full max-w-[1440px] mx-auto px-4;
+}
+
+/* --- 2. CUSTOM SCROLLBAR --- */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 rounded-full border-[2px] border-transparent bg-clip-content hover:bg-gray-400;
+}
+
+/* --- 3. COMPONENTS --- */
+
+/* Swiper Slider Styling */
+.product-images-slider .swiper-slide {
+  @apply pt-[100%] overflow-hidden relative rounded-xl bg-white border border-gray-100;
+}
+
+.product-images-slider .swiper-slide img {
+  @apply absolute top-0 left-0 w-full h-full object-contain p-4;
+}
+
+.product-images-slider-thumbs .swiper-slide {
+  @apply cursor-pointer rounded-lg overflow-hidden border-2 border-transparent transition-all opacity-60;
+}
+
+.product-images-slider-thumbs .swiper-slide-thumb-active {
+  @apply border-blue-500 opacity-100;
+}
+
+.product-images-slider-thumbs-wrapper {
+  @apply pt-[100%] relative;
+}
+
+.product-images-slider-thumbs-wrapper img {
+  @apply absolute top-0 left-0 w-full h-full object-cover;
+}
+
+/* Accordion */
+.accordion {
+  @apply w-full bg-white rounded-lg overflow-hidden border border-gray-200 mb-2;
+}
+
+.accordion__title {
+  @apply px-5 py-3 font-semibold text-gray-700 cursor-pointer flex items-center justify-between bg-white hover:bg-gray-50 transition-colors;
+}
+
+.accordion.active .accordion__icon svg {
+  @apply rotate-180 text-blue-600;
+}
+
+.accordion__icon svg {
+  @apply transition-transform duration-300;
+}
+
+.accordion__content {
+  @apply max-h-0 overflow-hidden transition-all duration-300 bg-white;
+}
+
+.accordion.active .accordion__content {
+  @apply max-h-[500px] p-5 border-t border-gray-100;
+}
+
+/* Product Description Block */
+.ProductDescription {
+  @apply bg-white rounded-xl shadow-sm overflow-hidden mt-5 border border-gray-100;
+}
+
+.product-description {
+  @apply font-sans text-gray-700 leading-relaxed p-8 text-justify;
+}
+
+.product-description h2 { @apply text-2xl mb-4 text-gray-900; }
+.product-description h3 { @apply text-xl mb-3 text-gray-800; }
+.product-description img { @apply rounded-lg my-5 w-full shadow-sm block; }
+
+/* --- 4. DATA TABLES --- */
+/* Thêm class 'custom-table' vào thẻ <table> của bạn */
+.custom-table {
+  @apply w-full border-collapse text-sm rounded-lg overflow-hidden border border-gray-200 bg-white;
+}
+
+.custom-table td {
+  @apply p-4 border-b border-gray-100 align-middle;
+}
+
+.custom-table tr:last-child td { @apply border-b-0; }
+.custom-table tr:nth-child(even) { @apply bg-gray-50; }
+.custom-table td:first-child { @apply font-medium text-gray-600 w-[40%]; }
+
+/* Wrapper cho bảng thông số */
+.product-parameters {
+  @apply p-8 bg-white;
+}
+
+/* --- 5. FORM ELEMENTS --- */
+
+/* Checkbox */
+.custom-checkbox {
+  @apply flex items-center py-2 cursor-pointer transition-colors hover:text-blue-600;
+}
+.custom-checkbox input { @apply hidden; }
+.custom-checkbox__checkmark {
+  @apply mr-3 flex items-center justify-center w-[22px] h-[22px] rounded border-2 border-gray-300 bg-white transition-all;
+}
+.custom-checkbox input:checked ~ .custom-checkbox__checkmark {
+  @apply bg-blue-500 border-blue-500 text-white;
+}
+
+/* Pagination */
+.pagination {
+  @apply flex items-center justify-center gap-2 mt-10;
+}
+.page-num {
+  @apply w-10 h-10 flex items-center justify-center cursor-pointer rounded-lg font-semibold bg-white text-gray-500 border border-gray-200 hover:text-blue-600 hover:border-blue-600 transition-all;
+}
+.active .page-num {
+  @apply bg-blue-500 text-white border-blue-500 shadow-md shadow-blue-500/20;
+}
+
+/* --- 6. GRID LAYOUTS (Responsive) --- */
+
+/* Desktop First Approach */
+.ProductDetail {
+  @apply grid gap-8 py-10;
+  grid-template-columns: minmax(0, 1fr) 380px;
+}
+
+.ProductDescription {
+  @apply grid;
+  grid-template-columns: minmax(0, 1fr) 400px;
+}
+
+.cart, .payment {
+  @apply grid gap-6 items-start;
+  grid-template-columns: minmax(0, 1fr) 380px;
+}
+.payment { @apply mt-10; }
+
+.wrapper-product {
+  @apply grid gap-8 mt-5 items-start;
+  grid-template-columns: 280px minmax(0, 1fr);
+}
+
+/* Mobile & Tablet Responsive */
+@media screen and (max-width: 1024px) {
+  .ProductDetail,
+  .ProductDescription,
+  .cart,
+  .payment,
+  .wrapper-product,
+  .feelback {
+    @apply grid-cols-1 gap-5 !important;
+  }
+  
+  .ProductDescription {
+    @apply flex flex-col-reverse;
+  }
+
+  .container { @apply px-4; }
+  .product-description { @apply p-4; }
+  
+  /* Ẩn sidebar filter trên mobile nếu cần */
+  /* .wrapper-product > div:first-child { display: none; } */
+}
