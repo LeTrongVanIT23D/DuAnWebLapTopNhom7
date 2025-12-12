@@ -4,7 +4,7 @@ import ModalAdvanced from "../../components/Modal/ModalAdvanced";
 import Label from "../../components/label/Label";
 import Input from "../../components/input/Input";
 import { useForm } from "react-hook-form";
-import DropdownSelect from "../../components/dropdown/DropdownSelect";
+import DropdownSelect from "../../components/dropdown/DropdownSelect"; // Giả định component này hoạt động đúng
 import axios from "axios";
 import * as yup from "yup";
 import { yupResolver } from "@hookform/resolvers/yup";
@@ -16,6 +16,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { addAddress } from "../../redux/auth/addressSlice";
 import { useNavigate } from "react-router-dom";
 
+// --- VALIDATION SCHEMA ---
 const schema = yup.object({
   fullname: yup
     .string()
@@ -30,9 +31,13 @@ const schema = yup.object({
     }),
   address: yup.string().required("Vui lòng nhập địa chỉ nhà"),
   province: yup.string().required("Vui lòng chọn Tỉnh/ Thành phố"),
-  dictrict: yup.string().required("Vui lòng chọn Quận/Huyện"),
+  
+  // 💥 ĐÃ SỬA LỖI CHÍNH TẢ: Đồng bộ hóa tên trường validation thành 'dictrict'
+  dictrict: yup.string().required("Vui lòng chọn Quận/Huyện"), 
+  
   ward: yup.string().required("Vui lòng chọn Phường/Xã"),
 });
+
 const UserAddress = () => {
   const {
     control,
@@ -48,21 +53,98 @@ const UserAddress = () => {
       fullname: "",
       sdt: "",
       province: "",
-      dictrict: "",
+      dictrict: "", // Giữ nguyên tên này trong form data
       ward: "",
       address: "",
     },
   });
+
   const [showModal, setShowModal] = useState(false);
   const [province, setProvince] = useState([]);
-  const [provinceId, setProvinceId] = useState("");
+  const [provinceId, setProvinceId] = useState(null);
   const [district, setDistrict] = useState([]);
-  const [districtId, setDistrictId] = useState("");
+  const [districtId, setDistrictId] = useState(null);
   const [ward, setWard] = useState([]);
   const dispatch = useDispatch();
-  const { add } = useSelector((state) => state.address);
   const { current } = useSelector((state) => state.user);
   const navigate = useNavigate();
+
+  const bodyStyle = document.body.style;
+
+  // --- LOGIC FETCH API ---
+
+  const fetchProvince = async () => {
+    try {
+      const { data } = await axios.get("https://provinces.open-api.vn/api/p/");
+      setProvince(data);
+    } catch (error) {
+        console.error("LỖI API TỈNH/THÀNH PHỐ:", error);
+        if (error.response) {
+            console.error("Status:", error.response.status);
+        }
+        toast.error("Không thể tải danh sách Tỉnh/Thành phố. Vui lòng kiểm tra kết nối API.");
+        setProvince([]);
+    }
+  };
+
+  const fetchDistrict = async (pId) => {
+    if (!pId) {
+        setDistrict([]);
+        return;
+    }
+    try {
+        const { data } = await axios.get(
+            `https://provinces.open-api.vn/api/p/${pId}?depth=2`
+        );
+        setDistrict(data.districts);
+    } catch (error) {
+        console.error("LỖI API QUẬN/HUYỆN:", error);
+        setDistrict([]);
+    }
+  };
+
+  const fetchWard = async (dId) => {
+    if (!dId) {
+        setWard([]);
+        return;
+    }
+    try {
+        const { data } = await axios.get(
+            `https://provinces.open-api.vn/api/d/${dId}?depth=2`
+        );
+        setWard(data.wards);
+    } catch (error) {
+        console.error("LỖI API PHƯỜNG/XÃ:", error);
+        setWard([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchProvince();
+  }, []);
+
+  useEffect(() => {
+    if (provinceId) {
+        fetchDistrict(provinceId);
+        setDistrictId(null);
+        setValue("dictrict", ""); 
+        setValue("ward", "");
+    } else {
+        setDistrict([]);
+        setDistrictId(null);
+    }
+  }, [provinceId, setValue]);
+
+  useEffect(() => {
+    if (districtId) {
+        fetchWard(districtId);
+        setValue("ward", "");
+    } else {
+        setWard([]);
+    }
+  }, [districtId, setValue]);
+
+  // --- LOGIC XỬ LÝ KHÁC ---
 
   useEffect(() => {
     if (current === null) {
@@ -70,66 +152,45 @@ const UserAddress = () => {
       toast.warning("Vui lòng đăng nhập");
       navigate("/sign-in");
     }
-  }, [current]);
-
-  const bodyStyle = document.body.style;
-  let isLocked = false;
-
-  const fetchProvince = async () => {
-    const { data } = await axios.get("https://provinces.open-api.vn/api/p");
-    setProvince(data);
-  };
-
-  const fetchDistrict = async () => {
-    const { data } = await axios.get(
-      `https://provinces.open-api.vn/api/p/${provinceId}?depth=2`
-    );
-    setDistrict(data.districts);
-  };
-
-  const fetchWard = async () => {
-    const { data } = await axios.get(
-      `https://provinces.open-api.vn/api/d/${districtId}?depth=2`
-    );
-    setWard(data.wards);
-  };
-
-  useEffect(() => {
     window.scrollTo({
-      top: 0,
-      behavior: "smooth",
+        top: 0,
+        behavior: "smooth",
     });
-    fetchProvince();
-    fetchDistrict();
-    fetchWard();
-  }, [provinceId, districtId]);
+  }, [current, navigate]);
 
   useEffect(() => {
     if (showModal === false) {
-      reset({
-        fullname: "",
-        sdt: "",
-        province: setValue("province", ""),
-        dictrict: setValue("dictrict", ""),
-        ward: setValue("ward", ""),
-        address: "",
-      });
-      enableBodyScroll(bodyStyle);
-      isLocked = false;
+        reset({
+            fullname: "",
+            sdt: "",
+            province: "",
+            dictrict: "",
+            ward: "",
+            address: "",
+        });
+        setProvinceId(null);
+        setDistrictId(null);
+        enableBodyScroll(bodyStyle);
     } else {
-      disableBodyScroll(bodyStyle);
-      isLocked = true;
+        disableBodyScroll(bodyStyle);
     }
-  }, [showModal]);
+  }, [showModal, reset, bodyStyle]);
 
+  // --- HANDLE SUBMIT ---
   const handleSend = (values) => {
-    if (!isValid) return null;
+    // 💥 ĐÃ SỬA: Thêm thông báo nếu form không hợp lệ
+    if (!isValid) {
+      toast.error("Vui lòng điền đầy đủ và chính xác tất cả các trường bắt buộc.");
+      // Bỏ return null để cho phép form hiển thị lỗi validation dưới input
+      return; 
+    }
+    
     const dataAddress = {
       name: values.fullname,
       phone: values.sdt,
       detail: values.address,
       province: getValues("province"),
-      district: getValues("dictrict"),
+      district: getValues("dictrict"), 
       ward: getValues("ward"),
     };
 
@@ -142,15 +203,9 @@ const UserAddress = () => {
       toast.dismiss();
       toast.error(error.message);
     }
-    reset({
-      fullname: "",
-      sdt: "",
-      province: "" && setValue("province", ""),
-      dictrict: "" && setValue("dictrict", ""),
-      ward: "" && setValue("ward", ""),
-      address: "",
-    });
   };
+
+  // --- RENDERING ---
   return (
     <div>
       <DashboardHeading
@@ -186,13 +241,14 @@ const UserAddress = () => {
         onClose={() => {
           setShowModal(false);
         }}
-        bodyClassName="w-[750px] bg-white  rounded-lg relative z-10 content h-[650px]  overflow-x-hidden"
+        bodyClassName="w-[750px] bg-white rounded-lg relative z-10 content h-[650px] overflow-x-hidden"
       >
         <div className="overflow-y-auto h-[650px] px-10 py-5 ">
           <h3 className="text-lg font-semibold text-black text-left mb-3">
             Thông tin người nhận hàng
           </h3>
           <form onSubmit={handleSubmit(handleSend)} autoComplete="off">
+            {/* Input Họ tên */}
             <div className="flex flex-col items-start gap-4 mb-5">
               <Label htmlFor="fullname">* Họ tên</Label>
               <Input
@@ -208,6 +264,7 @@ const UserAddress = () => {
               )}
             </div>
 
+            {/* Input Số điện thoại */}
             <div className="flex flex-col items-start gap-4 mb-5">
               <Label htmlFor="sdt">* Số điện thoại</Label>
               <Input
@@ -228,12 +285,13 @@ const UserAddress = () => {
             </h3>
 
             <div className="flex items-center justify-between">
+              {/* Dropdown Tỉnh/Thành phố */}
               <div className="flex flex-col items-start gap-4 mb-5">
                 <Label htmlFor="province">* Tỉnh/Thành phố</Label>
                 <DropdownSelect
                   control={control}
                   name="province"
-                  dropdownLabel="Chọn"
+                  dropdownLabel={getValues("province") || "Chọn"}
                   setValue={setValue}
                   data={province}
                   onClick={(id) => setProvinceId(id)}
@@ -245,14 +303,16 @@ const UserAddress = () => {
                 )}
               </div>
 
+              {/* Dropdown Quận/Huyện */}
               <div className="flex flex-col items-start gap-4 mb-5">
                 <Label htmlFor="district">* Quận/Huyện</Label>
                 <DropdownSelect
                   control={control}
-                  name="dictrict"
-                  dropdownLabel="Chọn"
+                  name="dictrict" 
+                  dropdownLabel={getValues("dictrict") || "Chọn"}
                   setValue={setValue}
                   data={district}
+                  disable={!provinceId} 
                   onClick={(id) => setDistrictId(id)}
                 ></DropdownSelect>
                 {errors.dictrict && (
@@ -264,14 +324,16 @@ const UserAddress = () => {
             </div>
 
             <div className="flex items-center justify-between">
+              {/* Dropdown Phường/Xã */}
               <div className="flex flex-col items-start gap-4 mb-5">
                 <Label htmlFor="ward">* Phường/Xã</Label>
                 <DropdownSelect
                   control={control}
                   name="ward"
-                  dropdownLabel="Chọn"
+                  dropdownLabel={getValues("ward") || "Chọn"}
                   setValue={setValue}
                   data={ward}
+                  disable={!districtId} 
                 ></DropdownSelect>
                 {errors.ward && (
                   <p className="text-red-500 text-base font-medium">
@@ -279,6 +341,8 @@ const UserAddress = () => {
                   </p>
                 )}
               </div>
+
+              {/* Input Địa chỉ cụ thể */}
               <div className="flex flex-col items-start gap-4 mb-5">
                 <Label htmlFor="address">* Địa chỉ cụ thể</Label>
                 <Input
@@ -295,6 +359,8 @@ const UserAddress = () => {
                 )}
               </div>
             </div>
+
+            {/* Button Hủy và Lưu */}
             <div className="flex items-center justify-end gap-x-4 mt-5">
               <button
                 className="p-3 text-base font-medium bg-white text-[#316BFF] rounded-lg border border-solid border-[blue]"

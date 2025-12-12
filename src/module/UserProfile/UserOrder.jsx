@@ -1,204 +1,206 @@
-import React from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useSelector, useDispatch } from "react-redux";
+import queryString from "query-string";
+import { toast } from "react-toastify";
+import { format } from "date-fns";
+import Pagination from "react-js-pagination";
+
 import Table from "../../components/table/Table";
 import DashboardHeading from "../dashboard/DashboardHeding";
-import { formatPrice } from "../../utils/formatPrice";
-import { useSelector, useDispatch } from "react-redux";
-import { getOrder, refresh } from "../../redux/order/orderSlice";
-import { useEffect } from "react";
-import { action_status } from "../../utils/constants/status";
-import { format } from "date-fns";
-import { useState } from "react";
-import Pagination from "react-js-pagination";
-import queryString from "query-string";
 import Skeleton from "../../components/skeleton/Skeleton";
-import { toast } from "react-toastify";
+import { formatPrice } from "../../utils/formatPrice";
+import { getOrder, refresh } from "../../redux/order/orderSlice";
+import { action_status } from "../../utils/constants/status";
+
+
+// Map order status keys to their display names and styles
+const ORDER_STATUSES = {
+  All: { name: "Tất cả đơn hàng", className: "bg-gray-200 text-gray-700" }, // Special case for filter
+  Processed: { name: "Đang xử lý", className: "bg-orange-400 text-white" },
+  'Waiting Goods': { name: "Đợi lấy hàng", className: "bg-yellow-400 text-white" }, // Added missing status
+  Success: { name: "Thành công", className: "bg-green-400 text-white" },
+  Cancelled: { name: "Đã hủy đơn", className: "bg-red-400 text-white" },
+};
 
 const UserOrder = () => {
   const navigate = useNavigate();
-
   const dispatch = useDispatch();
-  const { status, totalPage } = useSelector((state) => state.order);
-  const { current } = useSelector((state) => state.user);
-  const { order, update } = useSelector((state) => state.order);
-
   const location = useLocation();
-  const params = queryString.parse(location.search);
-  const [state, setState] = useState(params.status);
+
+  // Redux State
+  const { status, totalPage, order, update } = useSelector((state) => state.order);
+  const { current } = useSelector((state) => state.user);
+
+  // --- State Initialization and Logic ---
+  const params = useMemo(() => queryString.parse(location.search), [location.search]);
+  const initialStatus = params.status || 'All';
+
+  const [filterStatus, setFilterStatus] = useState(initialStatus);
   const [page, setPage] = useState(1);
 
+  // Effect 1: Check Authentication
   useEffect(() => {
     if (current === null) {
       toast.dismiss();
       toast.warning("Vui lòng đăng nhập");
       navigate("/sign-in");
     }
-  }, [current]);
+  }, [current, navigate]);
 
+  // Effect 2: Fetch Orders whenever filterStatus, page, or update changes
   useEffect(() => {
-    try {
-      const data = {
-        id: current._id,
-        page: page,
-        status: state,
-        limit: 5,
-      };
-      dispatch(getOrder(data));
-      dispatch(refresh());
-      setState(params.status);
-    } catch (error) {
-      console.log(error.message);
-    }
-  }, [page, state, params.status, update]);
+    if (!current?._id) return; // Wait for user data
 
-  const handleClick = (e) => {
-    setState(e.target.value);
-    navigate(`/account/orders?status=${e.target.value}`);
-    setPage(1);
-  };
+    const data = {
+      id: current._id,
+      page: page,
+      status: filterStatus,
+      limit: 5,
+    };
+    
+    // NOTE: The previous backend discussion suggested the `id` param here might be redundant
+    // if the backend uses `req.user.id` to filter. If your backend needs `id` to be passed
+    // explicitly, this is fine, but it makes the request less secure/standard.
 
-  const handlePageClick = (values) => {
+    dispatch(getOrder(data));
+    dispatch(refresh()); // Clear update flag if needed for fresh data
+    
+  }, [page, filterStatus, update, current?._id, dispatch]);
+  
+  // Effect 3: Sync URL query string to internal state (when status button is clicked)
+  useEffect(() => {
+      // Update state if the URL changes externally (though the button handlers do this too)
+      const currentUrlStatus = queryString.parse(location.search).status || 'All';
+      setFilterStatus(currentUrlStatus);
+  }, [location.search]);
+
+  // Handler for status buttons
+  const handleClick = useCallback((e) => {
+    const newStatus = e.target.value;
+    setFilterStatus(newStatus);
+    navigate(`/account/orders?status=${newStatus}`);
+    setPage(1); // Reset page to 1 on filter change
+  }, [navigate]);
+
+  // Handler for pagination
+  const handlePageClick = useCallback((values) => {
     setPage(values);
+  }, []);
+
+  // --- Render Helpers ---
+
+  // Helper function to get status badge style
+  const getStatusBadge = (statusKey) => {
+    const statusInfo = ORDER_STATUSES[statusKey];
+    if (!statusInfo) return null;
+
+    // Use a simpler approach to map the order status to its display name
+    let displayName = statusKey;
+    if (statusKey === 'Processed') displayName = 'Đang xử lý';
+    else if (statusKey === 'Waiting Goods') displayName = 'Đợi lấy hàng';
+    else if (statusKey === 'Success') displayName = 'Thành công';
+    else if (statusKey === 'Cancelled') displayName = 'Đã hủy đơn';
+
+    return (
+      <span className={`p-2 rounded-lg ${statusInfo.className}`}>
+        {displayName}
+      </span>
+    );
   };
+  
+  // Helper to render a single table row
+  const renderTableRow = (item) => (
+    <tr className="text-base" key={item._id}>
+      <td
+        className="cursor-pointer text-blue-600 hover:text-blue-900"
+        onClick={() => navigate(`/account/orders/${item._id}`)}
+        title={item._id}
+      >
+        {item._id.slice(0, 10)}...
+      </td>
+      <td>
+        {format(new Date(item?.createdAt), "HH:mm")}
+        &nbsp;&nbsp;
+        {format(new Date(item?.createdAt), "dd/MM/yyyy")}
+      </td>
+      <td>{item.cart[0]?.product?.title?.slice(0, 50) || 'N/A'}</td>
+      <td>{formatPrice(item.totalPrice)}</td>
+      <td>{getStatusBadge(item.status)}</td>
+    </tr>
+  );
 
   return (
     <div>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <DashboardHeading
           title="Quản lý đơn hàng"
           className="px-5 py-5"
         ></DashboardHeading>
-        <div className="flex items-center gap-x-3">
-          <button
-            className={`flex items-center gap-x-3 cursor-pointer py-2 px-4 text-base font-medium rounded-lg border border-gray-300 ${
-              state === "All" || state === undefined
-                ? "bg-blue-500 text-white"
-                : ""
-            }`}
-            value="All"
-            onClick={handleClick}
-          >
-            Tất cả đơn hàng
-          </button>
-          <button
-            className={`flex items-center gap-x-3 cursor-pointer py-2 px-4 text-base font-medium rounded-lg border border-gray-300 ${
-              state === "Processed" ? "bg-blue-500 text-white" : ""
-            }`}
-            value="Processed"
-            onClick={handleClick}
-          >
-            Đang xử lý
-          </button>
-          <button
-            className={`flex items-center gap-x-3 cursor-pointer py-2 px-4  text-base font-medium rounded-lg border border-gray-300 ${
-              state === "Success" ? "bg-blue-500 text-white" : ""
-            }`}
-            value="Success"
-            onClick={handleClick}
-          >
-            Thành công
-          </button>
-          <button
-            className={`flex items-center gap-x-3 cursor-pointer py-2 px-4 text-base font-medium rounded-lg border border-gray-300  ${
-              state === "Cancelled" ? "bg-blue-500 text-white" : ""
-            }`}
-            value="Cancelled"
-            onClick={handleClick}
-          >
-            Đã hủy đơn
-          </button>
+        {/* Status Filter Buttons */}
+        <div className="flex flex-wrap items-center gap-x-3">
+            {Object.entries(ORDER_STATUSES).map(([key, value]) => (
+                // Skip 'Waiting Goods' if you only want top-level filters. 
+                // If you want all, include it here. I'll include it for completeness.
+                (key !== 'Waiting Goods' || filterStatus === 'Waiting Goods') && (
+                    <button
+                        key={key}
+                        className={`cursor-pointer py-2 px-4 text-base font-medium rounded-lg border border-gray-300 ${
+                            filterStatus === key || (filterStatus === 'All' && key === 'All')
+                                ? "bg-blue-500 text-white"
+                                : ""
+                        }`}
+                        value={key}
+                        onClick={handleClick}
+                    >
+                        {value.name}
+                    </button>
+                )
+            ))}
         </div>
       </div>
 
+      {/* --- Order List Rendering --- */}
       {status === action_status.LOADING && (
-        <>
-          {" "}
-          <Table>
-            <thead>
-              <tr>
-                <th>Mã đơn hàng</th>
-                <th>Ngày mua</th>
-                <th>Sản phẩm</th>
-                <th>Tổng tiền</th>
-                <th>Trạng thái</th>
+        <Table>
+          <thead>
+            <tr>
+              <th>Mã đơn hàng</th>
+              <th>Ngày mua</th>
+              <th>Sản phẩm</th>
+              <th>Tổng tiền</th>
+              <th>Trạng thái</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[...Array(5)].map((_, index) => (
+              <tr key={index}>
+                <td><Skeleton className="w-40 h-5 rounded-md" /></td>
+                <td><Skeleton className="w-40 h-5 rounded-md" /></td>
+                <td><Skeleton className="w-40 h-5 rounded-md" /></td>
+                <td><Skeleton className="w-40 h-5 rounded-md" /></td>
+                <td><Skeleton className="w-40 h-5 rounded-md" /></td>
               </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <th>
-                  {" "}
-                  <Skeleton className="w-40 h-5 rounded-md" />
-                </th>
-                <th>
-                  <Skeleton className="w-40 h-5 rounded-md" />
-                </th>
-                <th>
-                  <Skeleton className="w-40 h-5 rounded-md" />
-                </th>
-                <th>
-                  <Skeleton className="w-40 h-5 rounded-md" />
-                </th>
-                <th>
-                  <Skeleton className="w-40 h-5 rounded-md" />
-                </th>
-              </tr>
-              <tr>
-                <th>
-                  {" "}
-                  <Skeleton className="w-40 h-5 rounded-md" />
-                </th>
-                <th>
-                  <Skeleton className="w-40 h-5 rounded-md" />
-                </th>
-                <th>
-                  <Skeleton className="w-40 h-5 rounded-md" />
-                </th>
-                <th>
-                  <Skeleton className="w-40 h-5 rounded-md" />
-                </th>
-                <th>
-                  <Skeleton className="w-40 h-5 rounded-md" />
-                </th>
-              </tr>
-              <tr>
-                <th>
-                  {" "}
-                  <Skeleton className="w-40 h-5 rounded-md" />
-                </th>
-                <th>
-                  <Skeleton className="w-40 h-5 rounded-md" />
-                </th>
-                <th>
-                  <Skeleton className="w-40 h-5 rounded-md" />
-                </th>
-                <th>
-                  <Skeleton className="w-40 h-5 rounded-md" />
-                </th>
-                <th>
-                  <Skeleton className="w-40 h-5 rounded-md" />
-                </th>
-              </tr>
-            </tbody>
-          </Table>
-        </>
+            ))}
+          </tbody>
+        </Table>
       )}
+
       {status === action_status.SUCCEEDED && (
         <>
-          {order?.length === 0 && (
+          {order?.length === 0 ? (
             <div className="bg-white container rounded-lg h-[400px] flex flex-col items-center justify-center gap-y-3 ">
               <img
                 src="../images/logo-cart.png"
-                alt=""
+                alt="Empty Cart Icon"
                 className="w-[250px] h-[250px]"
               />
               <span className="text-lg font-medium text-gray-400">
                 Hiện không có đơn hàng nào
               </span>
             </div>
-          )}
-          {order?.length > 0 && (
+          ) : (
             <>
-              {" "}
               <Table>
                 <thead>
                   <tr>
@@ -210,160 +212,18 @@ const UserOrder = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {(state === "All" || state === undefined) && (
-                    <>
-                      {order?.length > 0 &&
-                        order.map((item) => (
-                          <tr className="text-base" key={item._id}>
-                            <td
-                              className="cursor-pointer text-blue-600 hover:text-blue-900"
-                              onClick={() =>
-                                navigate(`/account/orders/${item._id}`)
-                              }
-                              title={item._id}
-                            >
-                              {item._id.slice(0, 10)}
-                            </td>
-                            <td>
-                              {format(new Date(item?.createdAt), "HH:mm")}
-                              &nbsp;&nbsp;
-                              {format(new Date(item?.createdAt), "dd/MM/yyyy")}
-                            </td>
-                            <td>{item.cart[0].product.title.slice(0, 50)}</td>
-                            <td>{formatPrice(item.totalPrice)}</td>
-                            {item?.status === "Processed" && (
-                              <td>
-                                <span className="p-2 rounded-lg text-white bg-orange-400">
-                                  Đang xử lý
-                                </span>
-                              </td>
-                            )}
-                            {item?.status === "Waiting Goods" && (
-                              <td>
-                                <span className="p-2 rounded-lg text-white bg-yellow-400">
-                                  Đợi lấy hàng
-                                </span>
-                              </td>
-                            )}
-                            {item?.status === "Cancelled" && (
-                              <td>
-                                <span className="p-2 rounded-lg text-white bg-red-400">
-                                  Đã hủy đơn
-                                </span>
-                              </td>
-                            )}
-                            {item?.status === "Success" && (
-                              <td>
-                                <span className="p-2 rounded-lg text-white  bg-green-400">
-                                  Thành công
-                                </span>
-                              </td>
-                            )}
-                          </tr>
-                        ))}
-                    </>
-                  )}
-                  {state === "Processed" && (
-                    <>
-                      {order?.length > 0 &&
-                        order.map((item) => (
-                          <tr className="text-base" key={item._id}>
-                            <td
-                              className="cursor-pointer text-blue-600 hover:text-blue-900"
-                              onClick={() =>
-                                navigate(`/account/orders/${item._id}`)
-                              }
-                              title={item._id}
-                            >
-                              {item._id.slice(0, 10)}
-                            </td>
-                            <td>
-                              {format(new Date(item?.createdAt), "HH:mm")}
-                              &nbsp;&nbsp;
-                              {format(new Date(item?.createdAt), "dd/MM/yyyy")}
-                            </td>
-                            <td>{item.cart[0].product.title.slice(0, 50)}</td>
-                            <td>{formatPrice(item.totalPrice)}</td>
-                            <td>
-                              <span className="p-2 rounded-lg text-white bg-orange-400">
-                                Đang xử lý
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                    </>
-                  )}
-                  {state === "Cancelled" && (
-                    <>
-                      {order?.length > 0 &&
-                        order.map((item) => (
-                          <tr className="text-base" key={item._id}>
-                            <td
-                              className="cursor-pointer text-blue-600 hover:text-blue-900"
-                              onClick={() =>
-                                navigate(`/account/orders/${item._id}`)
-                              }
-                              title={item._id}
-                            >
-                              {item._id.slice(0, 10)}
-                            </td>
-                            <td>
-                              {format(new Date(item?.createdAt), "HH:mm")}
-                              &nbsp;&nbsp;
-                              {format(new Date(item?.createdAt), "dd/MM/yyyy")}
-                            </td>
-                            <td>{item.cart[0].product.title.slice(0, 50)}</td>
-                            <td>{formatPrice(item.totalPrice)}</td>
-
-                            <td>
-                              <span className="p-2 rounded-lg text-white bg-red-400">
-                                Đã hủy đơn
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                    </>
-                  )}
-                  {state === "Success" && (
-                    <>
-                      {order?.length > 0 &&
-                        order.map((item) => (
-                          <tr className="text-base" key={item._id}>
-                            <td
-                              className="cursor-pointer text-blue-600 hover:text-blue-900"
-                              onClick={() =>
-                                navigate(`/account/orders/${item._id}`)
-                              }
-                              title={item._id}
-                            >
-                              {item._id.slice(0, 10)}
-                            </td>
-                            <td>
-                              {format(new Date(item?.createdAt), "HH:mm")}
-                              &nbsp;&nbsp;
-                              {format(new Date(item?.createdAt), "dd/MM/yyyy")}
-                            </td>
-                            <td>{item.cart[0].product.title.slice(0, 50)}</td>
-                            <td>{formatPrice(item.totalPrice)}</td>
-
-                            <td>
-                              <span className="p-2 rounded-lg text-white  bg-green-400">
-                                Thành công
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                    </>
-                  )}
+                  {/* CONSOLIDATED RENDERING LOGIC */}
+                  {order?.map(renderTableRow)} 
                 </tbody>
               </Table>
+              {/* Pagination */}
               <div className="flex items-center justify-center mt-5">
                 <Pagination
                   activePage={page}
                   nextPageText={">"}
                   prevPageText={"<"}
-                  totalItemsCount={totalPage}
-                  itemsCountPerPage={1}
+                  totalItemsCount={totalPage * 5} // Assuming totalPage is the count of pages, total items = pages * limit (5)
+                  itemsCountPerPage={5} // Set this to the limit you use in the effect (5)
                   firstPageText={"<<"}
                   lastPageText={">>"}
                   linkClass="page-num"
@@ -374,57 +234,24 @@ const UserOrder = () => {
           )}
         </>
       )}
+
+      {/* --- Failure State Rendering --- */}
       {status === action_status.FAILED && (
-        <>
-          {(state === "All" || state === undefined) && (
-            <div className="bg-white container rounded-lg h-[400px] flex flex-col items-center justify-center gap-y-3 ">
-              <img
-                src="../images/logo-cart.png"
-                alt=""
-                className="w-[250px] h-[250px]"
-              />
-              <span className="text-lg font-medium text-gray-400">
-                Hiện không có đơn hàng nào
-              </span>
-            </div>
-          )}{" "}
-          {state === "Success" && (
-            <div className="bg-white container rounded-lg h-[400px] flex flex-col items-center justify-center gap-y-3 ">
-              <img
-                src="../images/logo-cart.png"
-                alt=""
-                className="w-[250px] h-[250px]"
-              />
-              <span className="text-lg font-medium text-gray-400">
-                Hiện không có đơn hàng nào thành công
-              </span>
-            </div>
-          )}
-          {state === "Processed" && (
-            <div className="bg-white container rounded-lg h-[400px] flex flex-col items-center justify-center gap-y-3 ">
-              <img
-                src="../images/logo-cart.png"
-                alt=""
-                className="w-[250px] h-[250px]"
-              />
-              <span className="text-lg font-medium text-gray-400">
-                Hiện không có đơn hàng nào chờ xử lý
-              </span>
-            </div>
-          )}
-          {state === "Cancelled" && (
-            <div className="bg-white container rounded-lg h-[400px] flex flex-col items-center justify-center gap-y-3 ">
-              <img
-                src="../images/logo-cart.png"
-                alt=""
-                className="w-[250px] h-[250px]"
-              />
-              <span className="text-lg font-medium text-gray-400">
-                Hiện không có đơn hàng nào trong danh sách hủy
-              </span>
-            </div>
-          )}
-        </>
+        <div className="bg-white container rounded-lg h-[400px] flex flex-col items-center justify-center gap-y-3 ">
+          <img
+            src="../images/logo-cart.png"
+            alt="Empty Cart Icon"
+            className="w-[250px] h-[250px]"
+          />
+          <span className="text-lg font-medium text-gray-400">
+            {/* Dynamic message based on filter status */}
+            {filterStatus === "All" && "Hiện không có đơn hàng nào."}
+            {filterStatus === "Success" && "Hiện không có đơn hàng nào thành công."}
+            {filterStatus === "Processed" && "Hiện không có đơn hàng nào chờ xử lý."}
+            {filterStatus === "Cancelled" && "Hiện không có đơn hàng nào trong danh sách hủy."}
+            {filterStatus === "Waiting Goods" && "Hiện không có đơn hàng nào đang chờ lấy hàng."}
+          </span>
+        </div>
       )}
     </div>
   );

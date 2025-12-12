@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
-import DropdownSelect from "../../components/dropdown/DropdownSelect";
+import DropdownSelect from "../../components/dropdown/DropdownSelect"; 
 import Input from "../../components/input/Input";
 import Label from "../../components/label/Label";
 import ModalAdvanced from "../../components/Modal/ModalAdvanced";
@@ -18,6 +18,7 @@ import {
   setAddressDefault,
 } from "../../redux/auth/addressSlice";
 
+// --- VALIDATION SCHEMA ---
 const schema = yup.object({
   fullname: yup
     .string()
@@ -35,15 +36,16 @@ const schema = yup.object({
   district: yup.string().required("Vui lòng chọn Quận/ Huyện"),
   ward: yup.string().required("Vui lòng chọn Phường/Xã"),
 });
+
 const ItemAddress = ({ data, data_key }) => {
   const [showModal, setShowModal] = useState(false);
   const bodyStyle = document.body.style;
-  let isLocked = false;
+
   const {
     control,
     reset,
     handleSubmit,
-    formState: { isSubmitting, isValid, errors },
+    formState: { isSubmitting, errors },
     setValue,
     getValues,
   } = useForm({
@@ -60,57 +62,152 @@ const ItemAddress = ({ data, data_key }) => {
   });
 
   const dispatch = useDispatch();
+  
+  // Trạng thái cho dữ liệu API và ID (code)
   const [province, setProvince] = useState([]);
-  const [provinceId, setProvinceId] = useState("");
+  const [provinceId, setProvinceId] = useState(null); // Sử dụng null
   const [district, setDistrict] = useState([]);
-  const [districtId, setDistrictId] = useState("");
+  const [districtId, setDistrictId] = useState(null); // Sử dụng null
   const [ward, setWard] = useState([]);
 
+  // Hàm fetchProvince: Tải danh sách tỉnh/thành phố
   const fetchProvince = async () => {
-    const { data } = await axios.get("https://provinces.open-api.vn/api/p");
-    setProvince(data);
+    try {
+      // ⚠️ ĐÃ SỬA: Thêm dấu gạch chéo cuối cùng (/)
+      const { data } = await axios.get("https://provinces.open-api.vn/api/p/");
+      setProvince(data);
+    } catch (error) {
+      console.error("LỖI API TỈNH/THÀNH PHỐ:", error);
+      toast.error("Không thể tải danh sách Tỉnh/Thành phố.");
+      setProvince([]);
+    }
   };
 
-  const fetchDistrict = async () => {
-    const { data } = await axios.get(
-      `https://provinces.open-api.vn/api/p/${provinceId}?depth=2`
-    );
-    setDistrict(data.districts);
+  // Hàm fetchDistrict: Tải danh sách Quận/Huyện dựa trên ProvinceId
+  const fetchDistrict = async (pId) => {
+    if (!pId) {
+      setDistrict([]);
+      return;
+    }
+    try {
+      const { data } = await axios.get(
+        `https://provinces.open-api.vn/api/p/${pId}?depth=2`
+      );
+      setDistrict(data.districts);
+    } catch (error) {
+      console.error("Lỗi khi tải Quận/Huyện:", error);
+      setDistrict([]);
+    }
   };
 
-  const fetchWard = async () => {
-    const { data } = await axios.get(
-      `https://provinces.open-api.vn/api/d/${districtId}?depth=2`
-    );
-    setWard(data.wards);
+  // Hàm fetchWard: Tải danh sách Phường/Xã dựa trên DistrictId
+  const fetchWard = async (dId) => {
+    if (!dId) {
+      setWard([]);
+      return;
+    }
+    try {
+      const { data } = await axios.get(
+        `https://provinces.open-api.vn/api/d/${dId}?depth=2`
+      );
+      setWard(data.wards);
+    } catch (error) {
+      console.error("Lỗi khi tải Phường/Xã:", error);
+      setWard([]);
+    }
   };
 
+  // Effect 1: Tải dữ liệu Tỉnh/Thành phố khi component mount
   useEffect(() => {
     fetchProvince();
-    fetchDistrict();
-    fetchWard();
-  }, [provinceId, districtId]);
+  }, []);
 
+  // Effect 2: Tải dữ liệu Quận/Huyện khi provinceId thay đổi
   useEffect(() => {
-    if (showModal === true) {
-      setValue("province", data.province);
-      setValue("district", data.district);
-      setValue("ward", data.ward);
+    if (provinceId) {
+      fetchDistrict(provinceId);
+      // Reset DistrictId và Ward khi ProvinceId thay đổi
+      setDistrictId(null); 
+      setValue("district", "");
+      setValue("ward", "");
+    } else {
+        setDistrict([]);
+        setDistrictId(null);
+    }
+  }, [provinceId, setValue]);
+
+  // Effect 3: Tải dữ liệu Phường/Xã khi districtId thay đổi
+  useEffect(() => {
+    if (districtId) {
+      fetchWard(districtId);
+      // Reset Ward khi DistrictId thay đổi
+      setValue("ward", "");
+    } else {
+        setWard([]);
+    }
+  }, [districtId, setValue]);
+
+  // Effect 4: Xử lý Modal Mở/Đóng và Set giá trị mặc định (Edit)
+  useEffect(() => {
+    if (showModal) {
+      // 1. Tải toàn bộ dữ liệu địa chỉ ban đầu dựa trên tên
+      const loadInitialIdsAndData = async () => {
+        // Tìm ID của tỉnh/thành phố dựa trên tên cũ (data.province)
+        const initialProvince = province.find(
+          (p) => p.name === data.province
+        );
+        if (initialProvince) {
+          const pCode = initialProvince.code;
+          setProvinceId(pCode);
+          
+          // Tải toàn bộ dữ liệu cấp 3 cho tỉnh/thành phố này
+          try {
+            const { data: pData } = await axios.get(`https://provinces.open-api.vn/api/p/${pCode}?depth=3`);
+            setDistrict(pData.districts);
+            
+            const initialDistrict = pData.districts.find(d => d.name === data.district);
+            if (initialDistrict) {
+              const dCode = initialDistrict.code;
+              setDistrictId(dCode);
+              
+              // Tìm Ward (đã có trong pData.districts[...].wards, nhưng chúng ta cần set state ward)
+              const districtWithWards = pData.districts.find(d => d.code === dCode);
+              if (districtWithWards) {
+                  setWard(districtWithWards.wards);
+              }
+            }
+          } catch (e) {
+              console.error("Lỗi tải địa chỉ ban đầu:", e);
+              toast.error("Không thể tải chi tiết địa chỉ cũ.");
+          }
+        }
+      };
+      
+      // Chạy logic khởi tạo ID
+      loadInitialIdsAndData();
+      
+      // 2. Set giá trị cho form (dùng tên cũ)
       reset({
         fullname: data.name,
         sdt: data.phone,
-        province: getValues("province"),
-        district: getValues("district"),
-        ward: getValues("ward"),
+        province: data.province, 
+        district: data.district,
+        ward: data.ward,
         address: data.detail,
       });
+
       disableBodyScroll(bodyStyle);
-      isLocked = true;
     } else {
       enableBodyScroll(bodyStyle);
-      isLocked = false;
+      // Khi đóng Modal, reset IDs và data để chuẩn bị cho lần mở tiếp theo
+      setProvinceId(null); 
+      setDistrictId(null);
+      setDistrict([]);
+      setWard([]);
     }
-  }, [showModal]);
+  }, [showModal, data, province, reset, bodyStyle]); // Thêm dependencies cần thiết
+
+  // --- HÀM XỬ LÝ SỰ KIỆN ---
 
   const handleDelete = () => {
     Swal.fire({
@@ -155,6 +252,7 @@ const ItemAddress = ({ data, data_key }) => {
       setShowModal(false);
     } catch (error) {
       console.log(error.message);
+      toast.error("Cập nhật thất bại.");
     }
   };
 
@@ -169,9 +267,10 @@ const ItemAddress = ({ data, data_key }) => {
     }
   };
 
+  // --- RENDERING ---
   return (
     <>
-      <div className="w-full bg-white  border-2 border-dotted text-black px-5 py-5 rounded-lg flex items-center justify-between my-7 focus:border-solid">
+      <div className="w-full bg-white border-2 border-dotted text-black px-5 py-5 rounded-lg flex items-center justify-between my-7 focus:border-solid">
         <div className="flex flex-col justify-between ">
           <div className="flex items-center gap-x-5 mb-2">
             <h3 className="font-medium text-base ">{data.name}</h3>
@@ -181,7 +280,6 @@ const ItemAddress = ({ data, data_key }) => {
               </div>
             )}
           </div>
-
           <div className="flex flex-col">
             <span className="text-sm font-normal">
               Địa chỉ: {data.detail} , {data.ward}, {data.district} ,
@@ -223,16 +321,15 @@ const ItemAddress = ({ data, data_key }) => {
 
       <ModalAdvanced
         visible={showModal}
-        onClose={() => {
-          setShowModal(false);
-        }}
-        bodyClassName="w-[750px] bg-white  rounded-lg relative z-10 content  overflow-y-auto "
+        onClose={() => setShowModal(false)}
+        bodyClassName="w-[750px] bg-white rounded-lg relative z-10 content overflow-y-auto"
       >
         <div className="h-[650px] overflow-x-hidden px-10 py-5 ">
           <h3 className="text-lg font-semibold text-black text-left mb-3">
             Thông tin người nhận hàng
           </h3>
           <form autoComplete="off" onSubmit={handleSubmit(handleEdit)}>
+            {/* Input Họ tên */}
             <div className="flex flex-col items-start gap-4 mb-5">
               <Label htmlFor="fullname">* Họ tên</Label>
               <Input
@@ -248,6 +345,7 @@ const ItemAddress = ({ data, data_key }) => {
               )}
             </div>
 
+            {/* Input Số điện thoại */}
             <div className="flex flex-col items-start gap-4 mb-5">
               <Label htmlFor="sdt">* Số điện thoại</Label>
               <Input
@@ -267,16 +365,17 @@ const ItemAddress = ({ data, data_key }) => {
               Địa chỉ nhận hàng
             </h3>
 
+            {/* Dropdown Tỉnh/Thành phố */}
             <div className="flex items-center justify-between">
               <div className="flex flex-col items-start gap-4 mb-5">
                 <Label htmlFor="province">* Tỉnh/Thành phố</Label>
                 <DropdownSelect
                   control={control}
                   name="province"
-                  dropdownLabel={data.province}
+                  dropdownLabel={getValues("province") || "Chọn"} 
                   setValue={setValue}
                   data={province}
-                  onClick={(id) => setProvinceId(id)}
+                  onClick={(id) => setProvinceId(id)} 
                 ></DropdownSelect>
                 {errors.province && (
                   <p className="text-red-500 text-base font-medium">
@@ -285,33 +384,39 @@ const ItemAddress = ({ data, data_key }) => {
                 )}
               </div>
 
+              {/* Dropdown Quận/Huyện */}
               <div className="flex flex-col items-start gap-4 mb-5">
                 <Label htmlFor="district">* Quận/Huyện</Label>
                 <DropdownSelect
                   control={control}
                   name="district"
-                  dropdownLabel={data.district}
+                  dropdownLabel={getValues("district") || "Chọn"}
                   setValue={setValue}
                   data={district}
-                  onClick={(id) => setDistrictId(id)}
+                  // disable nếu chưa chọn tỉnh
+                  disable={!provinceId} 
+                  onClick={(id) => setDistrictId(id)} 
                 ></DropdownSelect>
-                {errors.dictrict && (
+                {errors.district && (
                   <p className="text-red-500 text-base font-medium">
-                    {errors.dictrict?.message}
+                    {errors.district?.message}
                   </p>
                 )}
               </div>
             </div>
 
             <div className="flex items-center justify-between">
+              {/* Dropdown Phường/Xã */}
               <div className="flex flex-col items-start gap-4 mb-5">
                 <Label htmlFor="ward">* Phường/Xã</Label>
                 <DropdownSelect
                   control={control}
                   name="ward"
-                  dropdownLabel={data.ward}
+                  dropdownLabel={getValues("ward") || "Chọn"}
                   setValue={setValue}
                   data={ward}
+                  // disable nếu chưa chọn huyện
+                  disable={!districtId} 
                 ></DropdownSelect>
                 {errors.ward && (
                   <p className="text-red-500 text-base font-medium">
@@ -319,6 +424,8 @@ const ItemAddress = ({ data, data_key }) => {
                   </p>
                 )}
               </div>
+              
+              {/* Input Địa chỉ cụ thể */}
               <div className="flex flex-col items-start gap-4 mb-5">
                 <Label htmlFor="address">* Địa chỉ cụ thể</Label>
                 <Input
@@ -335,6 +442,8 @@ const ItemAddress = ({ data, data_key }) => {
                 )}
               </div>
             </div>
+            
+            {/* Button Hủy và Lưu */}
             <div className="flex items-center justify-end gap-x-4 mt-5">
               <button
                 className="p-3 text-base font-medium bg-white text-[#316BFF] rounded-lg border border-solid border-[blue]"
