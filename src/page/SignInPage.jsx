@@ -78,7 +78,7 @@ const SignInPage = () => {
         return;
       }
       toast.dismiss();
-      toast.success("Chào mừng bạn đến với HC.VN", { pauseOnHover: false });
+      toast.success("Chào mừng bạn đến với LapTopGaming.VN", { pauseOnHover: false });
       reset({
         email: "",
         password: "",
@@ -102,7 +102,7 @@ const SignInPage = () => {
           const resultAction = await dispatch(loginWithGoogle(data));
           unwrapResult(resultAction);
           toast.dismiss();
-          toast.success("Chào mừng bạn đến với HC.VN", { pauseOnHover: false });
+          toast.success("Chào mừng bạn đến với LapTopGaming.VN", { pauseOnHover: false });
           navigate("/");
         } catch (error) {
           toast.dismiss();

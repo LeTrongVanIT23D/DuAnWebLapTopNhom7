@@ -141,7 +141,7 @@ const Sidebar = () => {
             className="w-full object-cover"
           />
         </div>
-        <span className="font-semibold text-xl">HC.VN</span>
+        <span className="font-semibold text-xl">LapTopGaming.VN</span>
       </div>
       {sidebarLinks.map((link) => {
         if (link.onClick) {

@@ -29,7 +29,7 @@ const CartPage = () => {
 
   const handlePrint = useReactToPrint({
     content: () => componentRef.current,
-    documentTitle: "Báo giá sản phẩm - HC.VN",
+    documentTitle: "Báo giá sản phẩm - LapTopGaming.VN",
     onAfterPrint: () => {
       toast.dismiss();
       toast.success("In báo giá thành công!", { pauseOnHover: false });
