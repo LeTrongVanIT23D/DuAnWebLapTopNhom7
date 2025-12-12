@@ -1,18 +1,22 @@
+// Ai đã sửa: Chuẩn hóa việc kiểm tra tồn kho sản phẩm
+
 import React from "react";
 import { useDispatch } from "react-redux";
 import { removeFromCart, setQuantity } from "../../redux/cart/cartSlice";
 import Swal from "sweetalert2";
-import { toast } from "react-toastify"; // Import thêm để báo lỗi nếu hết hàng
+import { toast } from "react-toastify"; 
 
 const QuantityCard = ({ data }) => {
   const dispatch = useDispatch();
 
-  // Lấy số lượng tối đa từ dữ liệu sản phẩm (Backend đã sửa thành quantity)
-  const maxStock = data?.product?.quantity || 0;
+  // --- SỬA LỖI Ở ĐÂY ---
+  // 1. Ưu tiên lấy 'quantity' (mới), nếu không có thì tìm 'inventory' (cũ), nếu không có nữa thì là 0
+  // 2. Ép kiểu Number để so sánh chính xác
+  const maxStock = Number(data?.product?.quantity || data?.product?.inventory || 0);
 
   const handleDecreaseQuantity = () => {
     const newQty = data.quantity - 1;
-    if (newQty < 1) return; // Không cho giảm dưới 1
+    if (newQty < 1) return; 
 
     dispatch(setQuantity({
       id: data.id,
@@ -48,7 +52,7 @@ const QuantityCard = ({ data }) => {
     }).then((result) => {
       if (result.isConfirmed) {
         dispatch(removeFromCart(id));
-        toast.success("Đã xóa sản phẩm");
+        // toast.success("Đã xóa sản phẩm"); // Bật lên nếu muốn thông báo
       }
     });
   };
@@ -86,7 +90,8 @@ const QuantityCard = ({ data }) => {
         <button
           className="p-2 bg-gray-50 hover:bg-gray-200 transition-colors cursor-pointer disabled:opacity-50"
           onClick={handleIncreaseQuantity}
-          disabled={data.quantity >= maxStock}
+          // Chỉ disable khi đã xác định được tồn kho (>0) và số lượng đã đạt trần
+          disabled={maxStock > 0 && data.quantity >= maxStock}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
