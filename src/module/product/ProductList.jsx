@@ -1,10 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import ProductItem from "./ProductItem";
 import slugify from "slugify";
 import Pagination from "react-js-pagination";
 import ModalAdvanced from "../../components/Modal/ModalAdvanced";
-import { useEffect } from "react";
 import { formatPrice } from "../../utils/formatPrice";
 import { disableBodyScroll, enableBodyScroll } from "body-scroll-lock";
 
@@ -12,15 +11,24 @@ const ProductList = ({ data, handlePageClick, page, totalPage }) => {
   const navigate = useNavigate();
   const bodyStyle = document.body.style;
   const [showModal, setShowModal] = useState(false);
+  const [selectedItems, setSelectedItems] = useState([]);
 
   const handleClick = (item) => {
     const path = slugify(item.title, { strict: true });
     navigate(`/${path}/${item._id}`);
   };
-  const [selectedItems, setSelectedItems] = useState([]);
 
   const addToCompare = (item) => {
-    setSelectedItems((selectedItems) => [...selectedItems, item]);
+    if (selectedItems.length < 2 && !selectedItems.find(i => i._id === item._id)) {
+        setSelectedItems((prev) => [...prev, item]);
+    }
+  };
+
+  const removeFromCompare = (item) => {
+    const filteredItems = selectedItems.filter(
+      (product) => product._id !== item._id // Assuming _id is the unique identifier
+    );
+    setSelectedItems(filteredItems);
   };
 
   useEffect(() => {
@@ -30,391 +38,137 @@ const ProductList = ({ data, handlePageClick, page, totalPage }) => {
   }, [selectedItems]);
 
   useEffect(() => {
-    if (showModal === true) {
+    if (showModal) {
       disableBodyScroll(bodyStyle);
     } else {
       enableBodyScroll(bodyStyle);
     }
-  }, [showModal]);
+  }, [showModal, bodyStyle]);
 
-  const removeFromCompare = (item) => {
-    const filteredItems = selectedItems.filter(
-      (product) => product.id !== item.id
-    );
-    setSelectedItems((selectedItems) => filteredItems);
-  };
+  // Safe check for data array
+  const products = Array.isArray(data) ? data : [];
 
   return (
     <>
       <div className="mt-20">
-        <div className="flex flex-col container rounded-lg bg-white ">
-          <div className="flex items-center justify-between p-5 ">
-            <span className="font-bold text-xl">Laptop</span>
-            <div className="flex items-center gap-x-1 cursor-pointer">
-              <span
-                className="text-base text-[#a497a2] font-semibold "
+        <div className="flex flex-col container rounded-lg bg-white shadow-sm">
+          <div className="flex items-center justify-between p-5 border-b border-gray-100">
+            <span className="font-bold text-xl text-gray-800">Laptop</span>
+            <div 
+                className="flex items-center gap-x-1 cursor-pointer hover:text-blue-600 transition-colors"
                 onClick={() => navigate("/product")}
-              >
-                Xem tất cả
-              </span>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth="1.5"
-                stroke="currentColor"
-                className="w-4 h-4"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M8.25 4.5l7.5 7.5-7.5 7.5"
-                />
+            >
+              <span className="text-sm font-semibold text-gray-500">Xem tất cả</span>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-4 h-4">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
               </svg>
             </div>
           </div>
-          <div className="grid-cols-5 grid gap-y-2 pb-10 items-stretch">
-            {data.length > 0 &&
-              data.map((item, index) => (
+          
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 p-4">
+            {products.length > 0 ? (
+              products.map((item, index) => (
                 <ProductItem
+                  key={item._id || index}
                   product={item}
                   onClickItem={() => handleClick(item)}
-                  key={index}
-                  className="border-2 border-solid border-[#f6f6f6]"
+                  className="border border-gray-100 hover:shadow-md transition-shadow"
                   selected={selectedItems}
                   addToCompare={addToCompare}
                   removeFromCompare={removeFromCompare}
                 />
-              ))}
+              ))
+            ) : (
+                <div className="col-span-5 text-center py-10 text-gray-500">
+                    Không có sản phẩm nào.
+                </div>
+            )}
           </div>
         </div>
-        <div className="flex justify-center items-center">
-          <Pagination
-            activePage={page}
-            nextPageText={">"}
-            prevPageText={"<"}
-            totalItemsCount={totalPage}
-            itemsCountPerPage={1}
-            firstPageText={"<<"}
-            lastPageText={">>"}
-            linkClass="page-num"
-            onChange={handlePageClick}
-          />
-        </div>
-      </div>
-      {selectedItems.length === 2 && (
-        <div>
-          <ModalAdvanced
-            visible={showModal}
-            onClose={() => {
-              setShowModal(false);
-              setSelectedItems([]);
-            }}
-            bodyClassName="w-[1050px] bg-white rounded-lg relative z-10 content  overflow-hidden "
-          >
-            <div className="overflow-y-auto h-[600px] p-10">
-              <table className="table-product items-center table-fixed w-full">
-                <thead>
-                  <tr>
-                    <th></th>
-                    <th className="text-base font-semibold items-start">
-                      Sản phẩm 1
-                    </th>
-                    <th className="text-base font-semibold">Sản phẩm 2</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td className="text-base font-semibold">Ảnh sản phẩm</td>
-                    <td>
-                      <img
-                        src={selectedItems[0]?.images[0]}
-                        alt=""
-                        className="w-[200px] h-[200px] object-cover mx-auto"
-                      />
-                    </td>
-                    <td>
-                      <img
-                        src={selectedItems[1]?.images[0]}
-                        alt=""
-                        className="w-[200px] h-[200px] object-cover mx-auto"
-                      />
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="text-base font-semibold">Tên sản phẩm</td>
-                    <td>
-                      <span
-                        className="text-base font-normal line-clamp-2 cursor-pointer"
-                        title={selectedItems[0]?.title}
-                      >
-                        {selectedItems[0]?.title}
-                      </span>
-                    </td>
-                    <td>
-                      <span
-                        className="text-base font-normal line-clamp-2 cursor-pointer"
-                        title={selectedItems[1]?.title}
-                      >
-                        {selectedItems[1]?.title}
-                      </span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="text-base font-semibold">Thương hiệu</td>
-                    <td>
-                      <span className="text-base font-normal">
-                        {selectedItems[0]?.brand.name}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="text-base font-normal">
-                        {selectedItems[1]?.brand.name}
-                      </span>
-                    </td>
-                  </tr>
 
-                  <tr>
-                    <td className="text-base font-semibold">Hệ điều hành</td>
-                    <td>
-                      <span className="text-base font-normal">
-                        {selectedItems[0]?.os}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="text-base font-normal">
-                        {selectedItems[1]?.os}
-                      </span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="text-base font-semibold">Màu sắc</td>
-                    <td>
-                      <span className="text-base font-normal">
-                        {selectedItems[0]?.color}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="text-base font-normal">
-                        {selectedItems[1]?.color}
-                      </span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="text-base font-semibold">CPU</td>
-                    <td>
-                      <span className="text-base font-normal">
-                        {selectedItems[0]?.cpu}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="text-base font-normal">
-                        {selectedItems[1]?.cpu}
-                      </span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="text-base font-semibold">Màn hình</td>
-                    <td>
-                      <span className="text-base font-normal">
-                        {selectedItems[0]?.screen}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="text-base font-normal">
-                        {selectedItems[1]?.screen}
-                      </span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="text-base font-semibold">Graphic Card</td>
-                    <td>
-                      <span className="text-base font-normal">
-                        {selectedItems[0]?.graphicCard}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="text-base font-normal">
-                        {selectedItems[1]?.graphicCard}
-                      </span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="text-base font-semibold">Pin</td>
-                    <td>
-                      <span className="text-base font-normal">
-                        {selectedItems[0]?.battery}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="text-base font-normal">
-                        {selectedItems[1]?.battery}
-                      </span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="text-base font-semibold">Nhu cầu</td>
-                    <td>
-                      <span className="text-base font-normal">
-                        {selectedItems[0]?.demand}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="text-base font-normal">
-                        {selectedItems[1]?.demand}
-                      </span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="text-base font-semibold">Ram</td>
-                    <td>
-                      <span className="text-base font-normal flex items-center gap-x-2">
-                        {selectedItems[0]?.ram}
-                        {Number(selectedItems[0]?.ram) -
-                          Number(selectedItems[1]?.ram) >=
-                          0 && (
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            strokeWidth="1.5"
-                            stroke="green"
-                            className="w-10 h-10"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                            />
-                          </svg>
-                        )}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="text-base font-normal flex items-center gap-x-2">
-                        {selectedItems[1]?.ram}
-                        {Number(selectedItems[1]?.ram) -
-                          Number(selectedItems[0]?.ram) >=
-                          0 && (
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            strokeWidth="1.5"
-                            stroke="green"
-                            className="w-10 h-10"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                            />
-                          </svg>
-                        )}
-                      </span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="text-base font-semibold">Khối lượng</td>
-                    <td>
-                      <span className="text-base font-normal flex items-center gap-x-2">
-                        {selectedItems[0]?.weight}
-                        {selectedItems[0]?.weight - selectedItems[1]?.weight <=
-                          0 && (
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            strokeWidth="1.5"
-                            stroke="green"
-                            className="w-10 h-10"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                            />
-                          </svg>
-                        )}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="text-base font-normal flex items-center gap-x-2">
-                        {selectedItems[1]?.weight}
-                        {selectedItems[1]?.weight - selectedItems[0]?.weight <=
-                          0 && (
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            strokeWidth="1.5"
-                            stroke="green"
-                            className="w-10 h-10"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                            />
-                          </svg>
-                        )}
-                      </span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="text-base font-semibold">Giá tiền</td>
-                    <td>
-                      <span className="text-base font-normal flex items-center gap-x-2">
-                        {formatPrice(selectedItems[0]?.promotion)}
-                        {selectedItems[0]?.promotion -
-                          selectedItems[1]?.promotion <=
-                          0 && (
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            strokeWidth="1.5"
-                            stroke="green"
-                            className="w-10 h-10"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                            />
-                          </svg>
-                        )}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="text-base font-normal flex items-center gap-x-2">
-                        {formatPrice(selectedItems[1]?.promotion)}
-                        {selectedItems[1]?.promotion -
-                          selectedItems[0]?.promotion <=
-                          0 && (
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            strokeWidth="1.5"
-                            stroke="green"
-                            className="w-10 h-10"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                            />
-                          </svg>
-                        )}
-                      </span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+        {/* FIX: Only render pagination if totalPage exists and is > 0 */}
+        {totalPage && totalPage > 0 ? (
+            <div className="flex justify-center items-center mt-8">
+            <Pagination
+                activePage={page}
+                itemsCountPerPage={10} // Ensure this matches your API limit
+                totalItemsCount={totalPage}
+                pageRangeDisplayed={5}
+                onChange={handlePageClick}
+                nextPageText=">"
+                prevPageText="<"
+                firstPageText="<<"
+                lastPageText=">>"
+                itemClass="page-item"
+                linkClass="page-link"
+                activeClass="active"
+            />
             </div>
-          </ModalAdvanced>
-        </div>
+        ) : null}
+      </div>
+
+      {selectedItems.length === 2 && (
+        <ModalAdvanced
+          visible={showModal}
+          onClose={() => {
+            setShowModal(false);
+            setSelectedItems([]);
+          }}
+          bodyClassName="w-[90vw] max-w-[1050px] bg-white rounded-xl relative z-50 h-[80vh] overflow-hidden flex flex-col"
+        >
+          <div className="overflow-y-auto p-6 flex-1">
+            <h3 className="text-2xl font-bold text-center mb-6 text-blue-800">So Sánh Chi Tiết</h3>
+            <table className="table-auto w-full border-collapse border border-gray-200">
+              <thead className="bg-gray-50 sticky top-0">
+                <tr>
+                  <th className="p-3 border">Tiêu chí</th>
+                  <th className="p-3 border w-1/3 text-blue-700">{selectedItems[0]?.title}</th>
+                  <th className="p-3 border w-1/3 text-blue-700">{selectedItems[1]?.title}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {/* Images */}
+                <tr>
+                  <td className="p-3 border font-semibold">Hình ảnh</td>
+                  <td className="p-3 border text-center">
+                    <img src={selectedItems[0]?.images?.[0]} alt="" className="w-32 h-32 object-contain mx-auto" />
+                  </td>
+                  <td className="p-3 border text-center">
+                    <img src={selectedItems[1]?.images?.[0]} alt="" className="w-32 h-32 object-contain mx-auto" />
+                  </td>
+                </tr>
+                {/* Price */}
+                <tr>
+                    <td className="p-3 border font-semibold">Giá bán</td>
+                    <td className="p-3 border text-center font-bold text-red-600">{formatPrice(selectedItems[0]?.promotion)}</td>
+                    <td className="p-3 border text-center font-bold text-red-600">{formatPrice(selectedItems[1]?.promotion)}</td>
+                </tr>
+                {/* Brand */}
+                <tr>
+                    <td className="p-3 border font-semibold">Thương hiệu</td>
+                    <td className="p-3 border text-center">{selectedItems[0]?.brand?.name}</td>
+                    <td className="p-3 border text-center">{selectedItems[1]?.brand?.name}</td>
+                </tr>
+                 {/* Specs Loop */}
+                 {[
+                    { label: "CPU", key: "cpu" },
+                    { label: "RAM", key: "ram" },
+                    { label: "Màn hình", key: "screen" },
+                    { label: "Card đồ họa", key: "graphicCard" },
+                    { label: "Pin", key: "battery" },
+                    { label: "Trọng lượng", key: "weight" },
+                    { label: "OS", key: "os" },
+                 ].map((spec) => (
+                    <tr key={spec.key}>
+                        <td className="p-3 border font-semibold">{spec.label}</td>
+                        <td className="p-3 border text-center">{selectedItems[0]?.[spec.key]}</td>
+                        <td className="p-3 border text-center">{selectedItems[1]?.[spec.key]}</td>
+                    </tr>
+                 ))}
+              </tbody>
+            </table>
+          </div>
+        </ModalAdvanced>
       )}
     </>
   );

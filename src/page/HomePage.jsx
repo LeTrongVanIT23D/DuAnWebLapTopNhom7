@@ -18,28 +18,43 @@ import { action_status } from "../utils/constants/status";
 const HomePage = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  
+  // Lấy state từ Redux
   const { status, totalPage, product } = useSelector((state) => state.product);
+  
   const [page, setPage] = useState(1);
   const productListRef = useRef(null);
 
-  // --- 1. DATA SLICING ---
-  const hotProducts = useMemo(() => Array.isArray(product) ? product.slice(0, 5) : [], [product]);
-  const newProducts = useMemo(() => Array.isArray(product) ? product.slice(5, 10) : [], [product]);
+  // --- 1. DATA SLICING (An toàn hóa dữ liệu đầu vào) ---
+  const hotProducts = useMemo(() => {
+    return Array.isArray(product) ? product.slice(0, 5) : [];
+  }, [product]);
 
-  // --- 2. IMAGE ERROR HANDLER (MỚI) ---
-  // Hàm này giúp tự động thay thế ảnh nếu link bị chặn hoặc hỏng
+  const newProducts = useMemo(() => {
+    return Array.isArray(product) ? product.slice(5, 10) : [];
+  }, [product]);
+
+  // --- 2. IMAGE ERROR HANDLER ---
   const handleImageError = (e) => {
-    e.target.src = "https://via.placeholder.com/400x300?text=No+Image"; // Ảnh thế chỗ an toàn
-    e.target.onerror = null; // Tránh vòng lặp vô tận
+    e.target.src = "https://via.placeholder.com/400x300?text=No+Image";
+    e.target.onerror = null;
   };
 
   // --- 3. AUTH CHECK ---
   useEffect(() => {
     const token = localStorage.getItem("jwt");
-    const user = JSON.parse(localStorage.getItem("user"));
-    if (token && user?.active === "verify") {
-      toast.warning("Vui lòng xác thực tài khoản", { pauseOnHover: false });
-      return navigate("/verify");
+    const userStr = localStorage.getItem("user");
+    // Kiểm tra kỹ hơn để tránh lỗi JSON.parse nếu userStr null
+    if (token && userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        if (user?.active === "verify") {
+          toast.warning("Vui lòng xác thực tài khoản", { pauseOnHover: false });
+          navigate("/verify");
+        }
+      } catch (e) {
+        // Nếu localStorage lỗi thì bỏ qua
+      }
     }
   }, [navigate]);
 
@@ -49,11 +64,13 @@ const HomePage = () => {
   }, []);
 
   useEffect(() => {
+    // Gọi API lấy sản phẩm (Trang hiện tại, Limit 10)
     dispatch(getProduct({ page: page, limit: 10 }));
   }, [page, dispatch]);
 
   const handlePageClick = (values) => {
     setPage(values);
+    // Cuộn mượt xuống danh sách sản phẩm
     productListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
@@ -114,13 +131,13 @@ const HomePage = () => {
         </section>
       )}
 
-      {/* === MIDDLE BANNER (Đã cập nhật xử lý lỗi ảnh) === */}
+      {/* === MIDDLE BANNER === */}
       <section className="container mx-auto px-4">
          <div className="w-full h-[120px] md:h-[180px] rounded-2xl overflow-hidden shadow-md relative group cursor-pointer">
             <img 
                src="https://images.unsplash.com/photo-1550745165-9bc0b252726f?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80" 
                alt="Tech Promo" 
-               onError={handleImageError} // Thêm xử lý lỗi ở đây
+               onError={handleImageError}
                className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"
             />
             <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-transparent flex items-center px-10">
@@ -145,15 +162,16 @@ const HomePage = () => {
         </section>
       )}
 
-      {/* === SECTION 3: ALL PRODUCTS === */}
+      {/* === SECTION 3: ALL PRODUCTS (MAIN LIST) === */}
       <section className="container mx-auto px-4" ref={productListRef}>
          <SectionHeader title="Gợi Ý Cho Bạn" />
          <div className="min-h-[600px]">
+            {/* --- FIX LỖI Ở ĐÂY: Thêm "|| 0" cho totalPage --- */}
             <ProductList
-              data={product}
+              data={product || []} // An toàn cho data
               handlePageClick={handlePageClick}
               page={page}
-              totalPage={totalPage}
+              totalPage={totalPage || 0} // Fix lỗi "value is null"
             />
          </div>
       </section>
