@@ -3,85 +3,62 @@ import axios from "axios";
 const axiosClient = axios.create({
   baseURL: "http://127.0.0.1:3000",
   headers: {
-    "Content-Type": "application/JSON", // Sửa: JSON → json
+    "Content-Type": "application/json",
   },
   withCredentials: true,
 });
 
-// === REQUEST INTERCEPTOR ===
+// === 1. REQUEST INTERCEPTOR (Gửi Token đi) ===
 axiosClient.interceptors.request.use(
   (config) => {
-    // Có thể thêm token ở đây
-    // const token = localStorage.getItem('token');
-    // if (token) config.headers.Authorization = `Bearer ${token}`;
+    // Lấy token từ LocalStorage (Đảm bảo key khớp với lúc bạn lưu)
+    const token = localStorage.getItem("jwt"); 
+    
+    if (token) {
+      // Gắn token vào Header để Backend xác thực
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => {
+    return Promise.reject(error);
+  }
 );
 
-// === RESPONSE INTERCEPTOR ===
+// === 2. RESPONSE INTERCEPTOR (Xử lý phản hồi) ===
 axiosClient.interceptors.response.use(
   (response) => {
-    return response.data; // Chỉ trả về data
+    // Nếu thành công, chỉ lấy phần data (bỏ qua status, headers...)
+    return response.data;
   },
   (error) => {
-    // KIỂM TRA error.response TRƯỚC KHI DESTRUCTURE
+    // --- XỬ LÝ LỖI CHUNG ---
+    
+    // 1. Lỗi từ Server trả về (có response)
     if (error.response) {
-      const { config, status, data } = error.response;
-
-      const URLs = [
-        "/api/v1/users/signup",
-        "/api/v1/users/login",
-        "/api/v1/users/verify",
-        "/api/v1/users/forgotPassword",
-        "/api/v1/users/changeState",
-        "/api/v1/users/logout",
-        "/api/v1/users/verifyResetPass",
-        "/api/v1/users/me",
-        "/api/v1/users/resetPassword/:token",
-        "/api/v1/users/updateMe",
-        "/api/v1/users/createAddress",
-        "/api/v1/users/me/address",
-        "/api/v1/users/deleteAddress",
-        "/api/v1/users/updateAddress",
-        "/api/v1/users/updateMyPassword",
-        "/api/v1/users/setDefaultAddress",
-        "/api/v1/products",
-        "/api/v1/reviews",
-        "/api/v1/products/:id/reviews",
-        "/api/v1/reviews/:id",
-        "/api/v1/orders",
-        "/api/v1/users/userLoginWith",
-        "/api/v1/comments",
-        "/api/v1/products/:id/comments",
-        "/api/v1/comments/:id",
-        "/api/v1/comments/setLike/:id",
-      ];
-
-      // Kiểm tra URL có trong danh sách không
-      const isMatchedURL = URLs.some((url) => {
-        // Xử lý URL có :id hoặc query
-        const regex = new RegExp("^" + url.replace(/:\w+/g, "\\w+").replace(/\?.*/, "") + "$");
-        return regex.test(config.url.replace(/\?.*/, "")); // Bỏ query string
-      });
-
-      // Chỉ xử lý lỗi cho các URL cụ thể + status code
-      if (
-        isMatchedURL &&
-        (status === 400 || status === 401 || status === 403 || status === 404 || status === 500)
-      ) {
-        const message = data?.message || "Đã có lỗi xảy ra";
-        throw new Error(message);
+      // Tự động logout nếu token hết hạn (401)
+      if (error.response.status === 401) {
+        // localStorage.clear();
+        // window.location.href = "/sign-in"; 
+        console.warn("Phiên đăng nhập hết hạn.");
       }
-    } else if (error.request) {
-      // Không nhận được response (mạng, server sập)
-      throw new Error("Không kết nối được tới server. Vui lòng kiểm tra kết nối mạng.");
-    } else {
-      // Lỗi cấu hình request
-      throw new Error("Đã có lỗi xảy ra khi gửi yêu cầu.");
-    }
 
-    return Promise.reject(error);
+      // Quan trọng: Trả về nguyên bản lỗi để Redux (rejectWithValue) bắt được message từ Backend
+      return Promise.reject(error);
+    } 
+    
+    // 2. Lỗi không nhận được phản hồi (Mạng rớt, Server sập)
+    else if (error.request) {
+      console.error("Không kết nối được Server:", error.request);
+      return Promise.reject(new Error("Không thể kết nối đến Server. Vui lòng kiểm tra mạng."));
+    } 
+    
+    // 3. Lỗi khi setup request
+    else {
+      console.error("Lỗi Config Axios:", error.message);
+      return Promise.reject(error);
+    }
   }
 );
 

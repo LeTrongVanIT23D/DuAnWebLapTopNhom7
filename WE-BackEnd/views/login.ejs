@@ -4,66 +4,70 @@
 <%- include('./partials/head.ejs') %>
 
 
-    <body class="bg-gradient-primary" data-alert=`${alert ? alert : '' }`>
-
+    <body class="bg-gray-100" data-alert=`${alert ? alert : '' }`>
         <div class="container mt-5">
-
-            <!-- Outer Row -->
             <div class="row justify-content-center">
+                <div class="col-xl-9 col-lg-11 col-md-10">
 
-                <div class="col-xl-10 col-lg-12 col-md-9">
-
-                    <div class="card o-hidden border-0 shadow-lg my-5">
+                    <div class="card o-hidden border-0 shadow-xl my-5 rounded-xl">
                         <div class="card-body p-0">
-                            <!-- Nested Row within Card Body -->
                             <div class="row">
-                                <div class="col-lg-6 d-none d-lg-block"
-                                    style="background: url(https://cdn.pixabay.com/photo/2018/05/16/15/41/computer-3406108_960_720.jpg);background-position: center; background-size: cover;">
+                                <div class="col-lg-6 d-none d-lg-block rounded-l-xl"
+                                    style="background-image: url(https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=1920&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D);
+                                    background-position: center; background-size: cover; border-top-left-radius: 0.75rem; border-bottom-left-radius: 0.75rem;">
+                                    <div class="p-5 text-center text-white bg-black bg-opacity-40 h-full flex flex-col justify-center items-center">
+                                        <h2 class="text-3xl font-bold mb-3">ADMIN PORTAL</h2>
+                                        <p class="text-lg">Quản lý kho hàng, đơn đặt hàng và hệ thống website.</p>
+                                    </div>
                                 </div>
                                 <div class="col-lg-6">
-                                    <div class="p-5">
-                                        <div class="text-center">
-                                            <h1 class="h4 text-gray-900 mb-4">Welcome Back!</h1>
+                                    <div class="p-6 md:p-8">
+                                        <div class="text-center mb-5">
+                                            <h1 class="h3 text-gray-900 font-bold mb-2">Chào mừng trở lại!</h1>
+                                            <p class="text-sm text-gray-500">Đăng nhập để tiếp tục quản lý.</p>
                                         </div>
+                                        
                                         <form class="user">
-                                            <div class="form-group">
+                                            <div class="form-group mb-4">
                                                 <input type="email" class="form-control form-control-user" id="email"
-                                                    aria-describedby="emailHelp" placeholder="Enter Email Address...">
+                                                    aria-describedby="emailHelp" placeholder="Địa chỉ Email...">
                                                 <input type="hidden" id="checkLogin">
                                             </div>
-                                            <div class="form-group">
+                                            <div class="form-group mb-4">
                                                 <input type="password" class="form-control form-control-user"
-                                                    id="password" placeholder="Password">
+                                                    id="password" placeholder="Mật khẩu">
                                             </div>
-                                            <div class="form-group">
+                                            
+                                            <div class="form-group flex justify-between items-center mb-6">
                                                 <div class="custom-control custom-checkbox small">
-                                                    <input type="checkbox" class="custom-control-input"
-                                                        id="customCheck">
-                                                    <label class="custom-control-label" for="customCheck">Remember
-                                                        Me</label>
+                                                    <input type="checkbox" class="custom-control-input" id="customCheck">
+                                                    <label class="custom-control-label text-sm text-gray-600" for="customCheck">Ghi nhớ tôi</label>
                                                 </div>
+                                                <a class="small text-blue-600 hover:text-blue-800" href="/forgot-password">Quên mật khẩu?</a>
                                             </div>
-                                            <button class="btn btn-primary btn-user btn-block" id="login">
-                                                Login
+
+                                            <button class="btn btn-primary btn-user btn-block text-white font-semibold uppercase tracking-wider py-3 rounded-full hover:bg-blue-700 transition-colors" id="login">
+                                                Đăng nhập
                                             </button>
-                                            <hr>
-                                            <!-- <a href="/google" class="btn btn-google btn-user btn-block">
-                                                <i class="fab fa-google fa-fw"></i> Login with Google
-                                            </a> -->
-                                            <div class="form-group text-center">
-                                                <button class="btn btn-block btn-social btn-google" id="btnGoogle"
-                                                    type="button"> <span class="fa fa-google"></span>Login with
-                                                    Google</button>
+                                            
+                                            <hr class="my-6">
+                                            
+                                            <div class="form-group text-center mb-3">
+                                                <button class="btn btn-block btn-social btn-google bg-red-500 hover:bg-red-600 text-white font-semibold py-2 rounded-lg transition-colors" id="btnGoogle" type="button"> 
+                                                    <i class="fab fa-google fa-fw mr-2"></i> Đăng nhập với Google
+                                                </button>
                                             </div>
                                             <div class="form-group text-center">
-                                                <button class="btn btn-block btn-social btn-facebook" id="btnFacebook"
-                                                    type="button"> <span class="fa fa-facebook"></span>Login with
-                                                    Facebook</button>
+                                                <button class="btn btn-block btn-social btn-facebook bg-blue-700 hover:bg-blue-800 text-white font-semibold py-2 rounded-lg transition-colors" id="btnFacebook" type="button"> 
+                                                    <i class="fab fa-facebook-f fa-fw mr-2"></i> Đăng nhập với Facebook
+                                                </button>
                                             </div>
                                         </form>
-                                        <hr>
+                                        
+                                        <hr class="my-6">
+                                        
                                         <div class="text-center">
-                                            <a class="small" href="">Forgot Password?</a>
+                                            <a class="small text-gray-600" href="/register">Chưa có tài khoản? Đăng ký ngay!</a>
                                         </div>
                                     </div>
                                 </div>
@@ -72,7 +76,6 @@
                     </div>
 
                 </div>
-
             </div>
 
         </div>
@@ -81,13 +84,9 @@
         <script type="module">
             // Import the functions you need from the SDKs you need
             import { initializeApp } from "https://www.gstatic.com/firebasejs/9.14.0/firebase-app.js";
-            import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.14.0/firebase-analytics.js";
-            import { getAuth, FacebookAuthProvider, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signInWithPopup } from "https://www.gstatic.com/firebasejs/9.14.0/firebase-auth.js";
-            // TODO: Add SDKs for Firebase products that you want to use
-            // https://firebase.google.com/docs/web/setup#available-libraries
-
+            import { getAuth, FacebookAuthProvider, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/9.14.0/firebase-auth.js";
+            
             // Your web app's Firebase configuration
-            // For Firebase JS SDK v7.20.0 and later, measurementId is optional
             const firebaseConfig = {
                 apiKey: "AIzaSyAb86cfstfZo11kk5EwkI3KPfPcXTV3DdI",
                 authDomain: "hc-tech.firebaseapp.com",
@@ -98,26 +97,52 @@
                 measurementId: "G-74XYX837EE"
             };
             // Initialize Firebase
-            const status = false;
             const app = initializeApp(firebaseConfig);
             const auth = getAuth(app);
             const provider = new GoogleAuthProvider(app);
             const facebookProvider = new FacebookAuthProvider(app);
             const btnGoogle = document.getElementById('btnGoogle');
+            const btnFacebook = document.getElementById('btnFacebook'); // Lấy nút Facebook
+
+            // Google Login
             btnGoogle.addEventListener('click', async e => {
                 try {
-                    const result = await signInWithPopup(auth, provider)
+                    const result = await signInWithPopup(auth, provider);
                     const user = result.user;
-                    $("#checkLogin").val(user.email)
+                    // Sau khi đăng nhập Firebase thành công, chuyển email sang hidden input
+                    $("#checkLogin").val(user.email);
+                    // Kích hoạt sự kiện change để login.js xử lý
+                    $("#checkLogin").trigger('change'); 
                 } catch (error) {
-                    if (error.message == "Firebase: Error (auth/popup-closed-by-user).") error.message = "Đã hủy đăng nhập";
-                    showAlert("error", error.message);
+                    let errorMessage = error.message;
+                    if (error.message.includes("auth/popup-closed-by-user")) {
+                         errorMessage = "Đã hủy đăng nhập";
+                    }
+                    showAlert("error", errorMessage);
                 }
-                if ($("#checkLogin").val() != "") $("#checkLogin").change()
-            })
+            });
 
+            // Facebook Login (Thêm logic Facebook)
+            btnFacebook.addEventListener('click', async e => {
+                try {
+                    const result = await signInWithPopup(auth, facebookProvider);
+                    const user = result.user;
+                    $("#checkLogin").val(user.email);
+                    $("#checkLogin").trigger('change');
+                } catch (error) {
+                    let errorMessage = error.message;
+                    if (error.message.includes("auth/popup-closed-by-user")) {
+                        errorMessage = "Đã hủy đăng nhập";
+                    } else if (error.message.includes("auth/account-exists-with-different-credential")) {
+                        errorMessage = "Tài khoản đã tồn tại với hình thức đăng nhập khác.";
+                    }
+                    showAlert("error", errorMessage);
+                }
+            });
 
         </script>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH57pYc0x4Q/zD9yF0bV1z8W8s3aK1N6V8V3i0V2u7p8J/l/d0r+b0iP7oK9e/B7D/Ww+G2b1w==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+        
         <script src="/js/login.js"></script>
     </body>
 

@@ -36,14 +36,17 @@ const schema = yup.object({
     .string()
     .required("Vui lòng chọn ngày sinh")
     .nullable()
-    .max(today, "Ngày sinh không hợp lệ"),
+    // Lưu ý: Cần xử lý logic validate ngày sinh cẩn thận với moment object vs string
+    .test("is-valid-date", "Ngày sinh không hợp lệ", (value) => {
+      return moment().diff(moment(value), 'days') >= 0;
+    }), 
   gender: yup.string().oneOf(["nam", "nữ", "khác"], "Vui lòng chọn giới tính"),
 });
 
 const Gender = {
   NAM: "nam",
   NU: "nữ",
-  Diff: "khác",
+  KHAC: "khác",
 };
 
 const UserAccount = () => {
@@ -67,38 +70,46 @@ const UserAccount = () => {
 
   const watchGender = watch("gender");
   const [image, setImage] = useState("");
-  const [progress, setProgress] = useState();
+  const [progress, setProgress] = useState(0);
 
+  // 1. Kiểm tra đăng nhập
   useEffect(() => {
-    if (current === null) {
+    const token = localStorage.getItem("jwt"); // Hoặc key bạn dùng lưu token
+    if (!token && !current) {
       toast.dismiss();
       toast.warning("Vui lòng đăng nhập");
       navigate("/sign-in");
     }
-  }, [current]);
+  }, [current, navigate]);
 
+  // 2. Logic sau khi update thành công -> Gọi lại data mới
   useEffect(() => {
     if (update) {
-      dispatch(getUser());
-      dispatch(refresh());
+      dispatch(getUser()); // Lấy data mới nhất từ server
+      dispatch(refresh()); // Reset biến update về false
     }
-  }, [update]);
+  }, [update, dispatch]);
 
+  // 3. Gọi dữ liệu lần đầu
   useEffect(() => {
     dispatch(getUser());
-  }, []);
+  }, [dispatch]);
 
+  // 4. QUAN TRỌNG: Fill dữ liệu vào form khi biến 'user' thay đổi
   useEffect(() => {
-    reset({
-      fullname: user?.name,
-      image: user?.avatar,
-      email: user?.email,
-      sdt: user?.phone,
-      dateOfBirth: user?.dateOfBirth,
-      gender: user?.gender,
-    });
-    setImage(getValues("image"));
-  }, [status]);
+    if (user) {
+      reset({
+        fullname: user.name || "",
+        image: user.avatar || "",
+        email: user.email || "",
+        sdt: user.phone || "",
+        // Format ngày tháng chuẩn YYYY-MM-DD cho input type="date"
+        dateOfBirth: user.dateOfBirth ? moment(user.dateOfBirth).format("YYYY-MM-DD") : "",
+        gender: user.gender || "nam",
+      });
+      setImage(user.avatar || "");
+    }
+  }, [user, reset]);
 
   const handleSelectImage = async (e) => {
     const file = e.target.files[0];
@@ -111,18 +122,24 @@ const UserAccount = () => {
     const formData = new FormData();
     formData.append("image", file);
 
-    const response = await axios({
-      method: "post",
-      data: formData,
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-      url: "https://api.imgbb.com/1/upload?key=faf46b849aaf25c8587aec2835f05b26",
-      onUploadProgress: (data) => {
-        setProgress(Math.round((100 * data.loaded) / data.total));
-      },
-    });
-    return response.data.data.url;
+    try {
+      const response = await axios({
+        method: "post",
+        data: formData,
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+        url: "https://api.imgbb.com/1/upload?key=faf46b849aaf25c8587aec2835f05b26",
+        onUploadProgress: (data) => {
+          setProgress(Math.round((100 * data.loaded) / data.total));
+        },
+      });
+      return response.data.data.url;
+    } catch (error) {
+      console.error("Upload image failed", error);
+      toast.error("Lỗi upload ảnh");
+      return "";
+    }
   };
 
   useEffect(() => {
@@ -132,21 +149,30 @@ const UserAccount = () => {
     });
   }, []);
 
-  const handleUpdate = (values) => {
+  const handleUpdate = async (values) => {
     if (!isValid) return;
+    
     const cloneValues = { ...values };
-    cloneValues.gender = getValues("gender");
+    cloneValues.gender = getValues("gender"); // Lấy giá trị gender hiện tại
     cloneValues.dateOfBirth = getValues("dateOfBirth");
     cloneValues.avatar = image;
     cloneValues.name = values.fullname;
     cloneValues.phone = values.sdt;
+
+    // Bỏ các trường không cần thiết gửi lên API nếu có (ví dụ email thường ko cho sửa ở đây)
+    
     try {
-      dispatch(updateInfoUser(cloneValues));
+      // Dispatch action update
+      await dispatch(updateInfoUser(cloneValues)).unwrap();
+      
       toast.dismiss();
       toast.success("Cập nhật thông tin thành công", { pauseOnHover: false });
+      
+      // Lưu ý: useEffect [update] sẽ chạy sau khi action này thành công để load lại data
     } catch (error) {
       toast.dismiss();
-      toast.error(error.message);
+      // Xử lý lỗi từ rejectWithValue trong Redux Toolkit trả về
+      toast.error(error?.message || "Cập nhật thất bại");
     }
   };
 
@@ -155,6 +181,21 @@ const UserAccount = () => {
     setProgress(0);
   };
 
+  if (status === action_status.LOADING && !user) {
+     return (
+        <div className="bg-white rounded-lg p-5">
+             <div className="pb-16">
+            <Field>
+              <Skeleton className="w-[100px] h-4 rounded-lg" />
+              <Skeleton className="w-36 h-36 rounded-full mx-auto" />
+            </Field>
+            {/* ... Skeleton Loading UI ... */}
+            <Skeleton className="w-full h-10 rounded-md mt-5" />
+          </div>
+        </div>
+     )
+  }
+
   return (
     <>
       <div className="bg-white rounded-lg">
@@ -162,43 +203,10 @@ const UserAccount = () => {
           title="Thông tin tài khoản"
           className="px-5 py-5"
         ></DashboardHeading>
-        {status === action_status.LOADING && (
-          <div className="pb-16">
+        
+        <form className="pb-16" onSubmit={handleSubmit(handleUpdate)}>
             <Field>
-              <Skeleton className="w-[100px] h-4 rounded-lg" />
-              <Skeleton className="w-36 h-36 rounded-full mx-auto" />
-            </Field>
-            <Field>
-              <Skeleton className="w-[100px] h-4 rounded-lg" />
-              <Skeleton className="w-full h-4 rounded-md" />
-            </Field>
-            <Field>
-              <Skeleton className="w-[100px] h-4 rounded-lg" />
-              <Skeleton className="w-full h-4 rounded-md" />
-            </Field>
-            <Field>
-              <Skeleton className="w-[100px] h-4 rounded-lg" />
-              <Skeleton className="w-full h-4 rounded-md" />
-            </Field>
-            <Field>
-              <Skeleton className="w-[100px] h-4 rounded-lg" />
-              <Skeleton className="w-full h-4 rounded-md" />
-            </Field>
-            <Field>
-              <Skeleton className="w-[100px] h-4 rounded-lg" />
-              <div className="flex items-center gap-x-5">
-                <Skeleton className="w-6 h-6 rounded-full" />
-                <Skeleton className="w-6 h-6 rounded-full" />
-                <Skeleton className="w-6 h-6 rounded-full" />
-              </div>
-            </Field>
-            <Skeleton className="w-[200px] h-[40px] rounded-lg mx-auto mt-10" />
-          </div>
-        )}
-        {status === action_status.SUCCEEDED && (
-          <form className="pb-16" onSubmit={handleSubmit(handleUpdate)}>
-            <Field>
-              <Label>Image</Label>
+              <Label>Ảnh đại diện</Label>
               <ImageUpload
                 onChange={handleSelectImage}
                 className="mx-auto"
@@ -219,7 +227,7 @@ const UserAccount = () => {
             </Field>
 
             <Field>
-              <Label htmlFor="fullname">Email</Label>
+              <Label htmlFor="email">Email</Label>
               <Input name="email" control={control} disabled></Input>
             </Field>
 
@@ -246,33 +254,37 @@ const UserAccount = () => {
             <Field>
               <FieldCheckboxes>
                 <Label htmlFor="gender">Giới tính</Label>
-                <Radio
-                  name="gender"
-                  control={control}
-                  checked={watchGender === Gender.NAM}
-                  value={Gender.NAM}
-                  onClick={() => setValue("gender", "nam")}
-                >
-                  Nam
-                </Radio>
-                <Radio
-                  name="gender"
-                  control={control}
-                  checked={watchGender === Gender.NU}
-                  value={Gender.NU}
-                  onClick={() => setValue("gender", "nu")}
-                >
-                  Nữ
-                </Radio>
-                <Radio
-                  name="gender"
-                  control={control}
-                  checked={watchGender === Gender.Diff}
-                  value={Gender.Diff}
-                  onClick={() => setValue("gender", "khac")}
-                >
-                  Khác
-                </Radio>
+                <div className="flex gap-x-5">
+                    <Radio
+                    name="gender"
+                    control={control}
+                    checked={watchGender === Gender.NAM}
+                    value={Gender.NAM}
+                    onClick={() => setValue("gender", "nam")}
+                    >
+                    Nam
+                    </Radio>
+                    <Radio
+                    name="gender"
+                    control={control}
+                    checked={watchGender === Gender.NU}
+                    value={Gender.NU}
+                    // Sửa lỗi: Set đúng giá trị 'nữ' khớp với Schema
+                    onClick={() => setValue("gender", "nữ")}
+                    >
+                    Nữ
+                    </Radio>
+                    <Radio
+                    name="gender"
+                    control={control}
+                    checked={watchGender === Gender.KHAC}
+                    value={Gender.KHAC}
+                    // Sửa lỗi: Set đúng giá trị 'khác' khớp với Schema
+                    onClick={() => setValue("gender", "khác")}
+                    >
+                    Khác
+                    </Radio>
+                </div>
               </FieldCheckboxes>
               {errors.gender && (
                 <p className="text-red-500 text-base font-medium">
@@ -292,7 +304,6 @@ const UserAccount = () => {
               Cập nhật thông tin
             </Button>
           </form>
-        )}
       </div>
     </>
   );
